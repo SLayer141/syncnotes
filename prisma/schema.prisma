@@ -1,0 +1,56 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  password      String?
+  emailVerified DateTime?
+  otp           String?
+  otpExpiry     DateTime?
+  magicLink     String?   @unique
+  magicLinkExpiry DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  notes         Note[]
+  sharedNotes   Share[]   @relation("SharedWith")
+  sharedByMe    Share[]   @relation("SharedBy")
+}
+
+model Note {
+  id          String    @id @default(cuid())
+  title       String
+  content     String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  author      User      @relation(fields: [authorId], references: [id])
+  authorId    String
+  shares      Share[]
+}
+
+model Share {
+  id        String   @id @default(cuid())
+  note      Note     @relation(fields: [noteId], references: [id])
+  noteId    String
+  sharedBy  User     @relation("SharedBy", fields: [sharedById], references: [id])
+  sharedById String
+  sharedWith User    @relation("SharedWith", fields: [sharedWithId], references: [id])
+  sharedWithId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([noteId, sharedWithId])
+}
