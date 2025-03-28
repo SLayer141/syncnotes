@@ -18,7 +18,9 @@
     "next-auth": "^4.24.11",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "resend": "^1.0.0"
+    "resend": "^1.1.0",
+    "tr46": "^5.1.0",
+    "whatwg-url": "^14.2.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { generateOTP, getOTPExpiryDate } from "@/lib/auth-utils";
 import { Resend } from "resend";
+
+if (!process.env.RESEND_API_KEY) {
+  throw new Error("Missing RESEND_API_KEY environment variable");
+}
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -27,54 +30,43 @@ export async function POST(request: Request) {
       );
     }
 
-    if (type === "otp") {
-      const otp = generateOTP();
-      const otpExpiry = getOTPExpiryDate();
+    // Generate a 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
+    try {
+      // Send OTP via Resend with simplified configuration
+      await resend.emails.send({
+        from: "onboarding@resend.dev",
+        to: email,
+        subject: "Your SyncNotes Login OTP",
+        text: `Your OTP is: ${otp}. This OTP will expire in 10 minutes.`,
+      });
+
+      // Only update the user's OTP after successful email sending
       await prisma.user.update({
-        where: { email },
+        where: { id: user.id },
         data: {
           otp,
           otpExpiry,
         },
       });
 
-      try {
-        // Send OTP email
-        const result = await resend.emails.send({
-          from: "onboarding@resend.dev", // Using Resend's default verified domain
-          to: email,
-          subject: "Your SyncNotes OTP",
-          html: `
-            <h1>Your OTP for SyncNotes</h1>
-            <p>Your OTP is: <strong>${otp}</strong></p>
-            <p>This OTP will expire in 10 minutes.</p>
-            <p>If you didn't request this OTP, please ignore this email.</p>
-          `,
-        });
-
-        console.log("Email sent successfully:", result);
-        return NextResponse.json(
-          { message: "OTP sent successfully" },
-          { status: 200 }
-        );
-      } catch (emailError) {
-        console.error("Error sending email:", emailError);
-        return NextResponse.json(
-          { message: "Failed to send OTP email" },
-          { status: 500 }
-        );
-      }
+      return NextResponse.json(
+        { message: "OTP sent successfully" },
+        { status: 200 }
+      );
+    } catch (emailError) {
+      console.error("Error sending email:", emailError);
+      return NextResponse.json(
+        { message: "Failed to send OTP email" },
+        { status: 500 }
+      );
     }
-
-    return NextResponse.json(
-      { message: "Invalid type" },
-      { status: 400 }
-    );
   } catch (error) {
-    console.error("Error in send-otp route:", error);
+    console.error("Error in OTP route:", error);
     return NextResponse.json(
-      { message: "Something went wrong" },
+      { message: "Failed to process OTP request" },
       { status: 500 }
     );
   }

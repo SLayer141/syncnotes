@@ -28,17 +28,49 @@ model User {
   notes         Note[]
   sharedNotes   Share[]   @relation("SharedWith")
   sharedByMe    Share[]   @relation("SharedBy")
+  organizations OrganizationMember[]
+}
+
+model Organization {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  members     OrganizationMember[]
+  notes       Note[]
+}
+
+model OrganizationMember {
+  id             String       @id @default(cuid())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  organizationId String
+  user           User         @relation(fields: [userId], references: [id])
+  userId         String
+  role           Role         @default(MEMBER)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, userId])
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+  VIEWER
 }
 
 model Note {
-  id          String    @id @default(cuid())
-  title       String
-  content     String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  author      User      @relation(fields: [authorId], references: [id])
-  authorId    String
-  shares      Share[]
+  id             String       @id @default(cuid())
+  title          String
+  content        String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  author         User         @relation(fields: [authorId], references: [id])
+  authorId       String
+  shares         Share[]
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  organizationId String
 }
 
 model Share {
