@@ -6,42 +6,57 @@ import { authOptions } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
 export async function createOrganization(formData: FormData) {
-  const session = await getServerSession(authOptions);
-  
-  if (!session?.user?.email) {
-    throw new Error("Not authenticated");
-  }
+  try {
+    console.log("Starting organization creation...");
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user?.email) {
+      console.error("No authenticated session found");
+      throw new Error("Not authenticated");
+    }
 
-  const name = formData.get("name") as string;
-  const description = formData.get("description") as string;
+    console.log("Session found for user:", session.user.email);
+    const name = formData.get("name") as string;
+    const description = formData.get("description") as string;
 
-  if (!name) {
-    throw new Error("Organization name is required");
-  }
+    console.log("Form data:", { name, description });
 
-  const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
-  });
+    if (!name) {
+      console.error("Organization name is missing");
+      throw new Error("Organization name is required");
+    }
 
-  if (!user) {
-    throw new Error("User not found");
-  }
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+    });
 
-  const organization = await prisma.organization.create({
-    data: {
-      name,
-      description,
-      members: {
-        create: {
-          userId: user.id,
-          role: "ADMIN",
+    if (!user) {
+      console.error("User not found in database:", session.user.email);
+      throw new Error("User not found");
+    }
+
+    console.log("Found user:", user.id);
+
+    const organization = await prisma.organization.create({
+      data: {
+        name,
+        description,
+        members: {
+          create: {
+            userId: user.id,
+            role: "ADMIN",
+          },
         },
       },
-    },
-  });
+    });
 
-  revalidatePath("/organizations");
-  return organization;
+    console.log("Organization created successfully:", organization.id);
+    revalidatePath("/organizations");
+    return organization;
+  } catch (error) {
+    console.error("Error in createOrganization:", error);
+    throw error;
+  }
 }
 
 export async function getOrganizations() {

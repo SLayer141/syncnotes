@@ -14,21 +14,18 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  password      String?
-  emailVerified DateTime?
-  otp           String?
-  otpExpiry     DateTime?
-  magicLink     String?   @unique
-  magicLinkExpiry DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  notes         Note[]
-  sharedNotes   Share[]   @relation("SharedWith")
-  sharedByMe    Share[]   @relation("SharedBy")
-  organizations OrganizationMember[]
+  id                String             @id @default(cuid())
+  name              String?
+  email             String?            @unique
+  password          String?
+  emailVerified     DateTime?
+  otp               String?
+  otpExpiry         DateTime?
+  magicLink         String?            @unique
+  magicLinkExpiry   DateTime?
+  organizations     OrganizationMember[]
+  createdNotes      Note[]             @relation("CreatedNotes")
+  editedNotes       NoteEdit[]         @relation("EditedNotes")
 }
 
 model Organization {
@@ -43,46 +40,45 @@ model Organization {
 
 model OrganizationMember {
   id             String       @id @default(cuid())
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   organizationId String
-  user           User         @relation(fields: [userId], references: [id])
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId         String
-  role           Role         @default(MEMBER)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  role          String       @default("MEMBER") // ADMIN, MEMBER, VIEWER
+  joinedAt      DateTime     @default(now())
 
   @@unique([organizationId, userId])
-}
-
-enum Role {
-  ADMIN
-  MEMBER
-  VIEWER
+  @@index([organizationId])
+  @@index([userId])
 }
 
 model Note {
-  id             String       @id @default(cuid())
-  title          String
-  content        String
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  author         User         @relation(fields: [authorId], references: [id])
-  authorId       String
-  shares         Share[]
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  id          String      @id @default(cuid())
+  title       String
+  content     String      @db.Text
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  createdBy   User        @relation("CreatedNotes", fields: [createdById], references: [id], onDelete: Cascade)
+  createdById String
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   organizationId String
+  editHistory NoteEdit[]
+  isShared    Boolean     @default(false)
+
+  @@index([organizationId])
+  @@index([createdById])
 }
 
-model Share {
+model NoteEdit {
   id        String   @id @default(cuid())
-  note      Note     @relation(fields: [noteId], references: [id])
   noteId    String
-  sharedBy  User     @relation("SharedBy", fields: [sharedById], references: [id])
-  sharedById String
-  sharedWith User    @relation("SharedWith", fields: [sharedWithId], references: [id])
-  sharedWithId String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  editedBy  User     @relation("EditedNotes", fields: [editedById], references: [id], onDelete: Cascade)
+  editedById String
+  title     String
+  content   String   @db.Text
+  editedAt  DateTime @default(now())
 
-  @@unique([noteId, sharedWithId])
+  @@index([noteId])
+  @@index([editedById])
 }
