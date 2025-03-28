@@ -11,11 +11,11 @@ import NotesTab from './components/NotesTab';
 interface Member {
   id: string;
   role: string;
-  createdAt: string;
+  joinedAt: string;
   user: {
     id: string;
-    name: string;
-    email: string;
+    name: string | null;
+    email: string | null;
   };
 }
 
@@ -43,15 +43,28 @@ export default function OrganizationPage() {
     } else if (status === "authenticated") {
       loadOrganization();
     }
+    console.log("Session status:", status);
+    console.log("Session data:", session);
   }, [status, params.id]);
 
   async function loadOrganization() {
     try {
+      console.log("Loading organization with ID:", params.id);
       const response = await fetch(`/api/organizations/${params.id}`);
       const data = await response.json();
       
+      console.log("API Response:", { 
+        status: response.status, 
+        statusText: response.statusText,
+        data 
+      });
+      
       if (!response.ok) {
-        throw new Error(data.message || "Failed to load organization");
+        throw new Error(data.message || `HTTP error! status: ${response.status}`);
+      }
+      
+      if (!data || !data.id) {
+        throw new Error("Invalid organization data received");
       }
       
       setOrganization(data);
@@ -61,6 +74,12 @@ export default function OrganizationPage() {
       );
       setIsAdmin(currentUserMember?.role === "ADMIN");
     } catch (err) {
+      console.error("Error loading organization:", {
+        error: err,
+        message: err instanceof Error ? err.message : "Unknown error",
+        params: params,
+        session: session
+      });
       setError(err instanceof Error ? err.message : "Failed to load organization");
     } finally {
       setIsLoading(false);
@@ -141,8 +160,24 @@ export default function OrganizationPage() {
     );
   }
 
-  if (!session || !organization) {
-    return null;
+  if (!session) {
+    console.log("No session found");
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <div className="text-lg text-white">Please log in to view this page.</div>
+      </div>
+    );
+  }
+
+  if (!organization) {
+    console.log("No organization data found");
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <div className="text-lg text-white">
+          {error || "Organization not found"}
+        </div>
+      </div>
+    );
   }
 
   return (

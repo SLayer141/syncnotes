@@ -8,55 +8,113 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    console.log("GET /api/organizations/[id] - Params:", params);
+    
+    // Test database connection
+    try {
+      await prisma.$connect();
+      console.log("Database connection successful");
+    } catch (dbError) {
+      console.error("Database connection failed:", dbError);
+      return NextResponse.json(
+        { message: "Database connection failed" },
+        { status: 500 }
+      );
+    }
+
     const session = await getServerSession(authOptions);
+    console.log("Session:", { 
+      authenticated: !!session, 
+      email: session?.user?.email,
+      id: session?.user?.id
+    });
 
     if (!session?.user?.email) {
+      console.log("Authentication failed - no session or email");
       return NextResponse.json(
         { message: "Not authenticated" },
         { status: 401 }
       );
     }
 
-    const organization = await prisma.organization.findFirst({
-      where: {
-        id: params.id,
-        members: {
-          some: {
-            user: {
-              email: session.user.email,
-            },
-          },
-        },
-      },
-      include: {
-        members: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
+    console.log("Fetching organization:", {
+      id: params.id,
+      userEmail: session.user.email
+    });
+
+    try {
+      const organization = await prisma.organization.findFirst({
+        where: {
+          id: params.id,
+          members: {
+            some: {
+              user: {
+                email: session.user.email,
               },
             },
           },
         },
-      },
-    });
+        include: {
+          members: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                },
+              },
+            },
+          },
+        },
+      });
 
-    if (!organization) {
-      return NextResponse.json(
-        { message: "Organization not found" },
-        { status: 404 }
-      );
+      console.log("Organization query result:", {
+        found: !!organization,
+        memberCount: organization?.members?.length,
+        organizationId: organization?.id
+      });
+
+      if (!organization) {
+        return NextResponse.json(
+          { message: "Organization not found" },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json(organization);
+    } catch (queryError) {
+      console.error("Database query failed:", {
+        error: queryError,
+        query: "organization.findFirst",
+        params: {
+          id: params.id,
+          userEmail: session.user.email
+        }
+      });
+      throw queryError; // Re-throw to be caught by outer catch
     }
-
-    return NextResponse.json(organization);
   } catch (error) {
-    console.error("Error fetching organization:", error);
+    console.error("Error fetching organization:", {
+      error,
+      errorName: error instanceof Error ? error.name : "Unknown",
+      errorMessage: error instanceof Error ? error.message : "Unknown error",
+      errorStack: error instanceof Error ? error.stack : "No stack trace",
+      params,
+    });
     return NextResponse.json(
-      { message: "Failed to fetch organization" },
+      { 
+        message: "Failed to fetch organization",
+        details: error instanceof Error ? error.message : "Unknown error"
+      },
       { status: 500 }
     );
+  } finally {
+    try {
+      await prisma.$disconnect();
+    } catch (disconnectError) {
+      console.error("Error disconnecting from database:", disconnectError);
+    }
   }
 }
 

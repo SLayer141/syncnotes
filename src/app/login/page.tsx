@@ -20,63 +20,69 @@ export default function LoginPage() {
     const formData = new FormData(event.currentTarget);
     const email = formData.get("email") as string;
 
-    if (authMethod === "otp" && !otpSent) {
-      try {
-        const response = await fetch("/api/auth/send-otp", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, type: "otp" }),
-        });
+    try {
+      if (authMethod === "otp") {
+        if (!otpSent) {
+          // Send OTP
+          const response = await fetch("/api/auth/send-otp", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, type: "otp" }),
+          });
 
-        const data = await response.json();
+          const data = await response.json();
 
-        if (!response.ok) {
-          throw new Error(data.message || "Failed to send OTP");
+          if (!response.ok) {
+            throw new Error(data.message || "Failed to send OTP");
+          }
+
+          setOtpSent(true);
+          setIsLoading(false);
+          return;
         }
 
-        setOtpSent(true);
-        setIsLoading(false);
-        return;
-      } catch (error) {
-        setError(error instanceof Error ? error.message : "Failed to send OTP");
-        setIsLoading(false);
-        return;
-      }
-    }
+        // Verify OTP
+        const response = await signIn("credentials", {
+          email,
+          otp: formData.get("otp"),
+          redirect: false,
+        });
 
-    try {
-      const response = await signIn("credentials", {
-        email,
-        password: formData.get("password"),
-        otp: formData.get("otp"),
-        redirect: false,
-      });
+        if (response?.error) {
+          throw new Error(response.error);
+        }
+      } else {
+        // Password login
+        const response = await signIn("credentials", {
+          email,
+          password: formData.get("password"),
+          redirect: false,
+        });
 
-      if (response?.error) {
-        setError(response.error);
-        setIsLoading(false);
-        return;
+        if (response?.error) {
+          throw new Error(response.error);
+        }
       }
 
       router.push("/");
       router.refresh();
     } catch (error) {
-      setError("An unexpected error occurred");
+      setError(error instanceof Error ? error.message : "An unexpected error occurred");
       setIsLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow">
+    <div className="min-h-screen flex items-center justify-center bg-gray-900">
+      <div className="max-w-md w-full space-y-8 p-8 bg-gray-800 rounded-lg shadow-lg">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-white">
             Sign in to your account
           </h2>
         </div>
         <form className="mt-8 space-y-6" onSubmit={onSubmit}>
           {error && (
-            <div className="bg-red-50 text-red-500 p-3 rounded text-sm">
+            <div className="bg-red-900/50 text-red-200 p-3 rounded text-sm">
               {error}
             </div>
           )}
@@ -90,11 +96,11 @@ export default function LoginPage() {
                 name="email"
                 type="email"
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                className="appearance-none rounded-t-md relative block w-full px-3 py-2 border border-gray-700 bg-gray-700 placeholder-gray-400 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="Email address"
               />
             </div>
-            {authMethod === "password" && (
+            {authMethod === "password" ? (
               <div>
                 <label htmlFor="password" className="sr-only">
                   Password
@@ -104,25 +110,26 @@ export default function LoginPage() {
                   name="password"
                   type="password"
                   required
-                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                  className="appearance-none rounded-b-md relative block w-full px-3 py-2 border border-gray-700 bg-gray-700 placeholder-gray-400 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                   placeholder="Password"
                 />
               </div>
-            )}
-            {authMethod === "otp" && otpSent && (
-              <div>
-                <label htmlFor="otp" className="sr-only">
-                  OTP
-                </label>
-                <input
-                  id="otp"
-                  name="otp"
-                  type="text"
-                  required
-                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                  placeholder="Enter OTP"
-                />
-              </div>
+            ) : (
+              otpSent && (
+                <div>
+                  <label htmlFor="otp" className="sr-only">
+                    OTP
+                  </label>
+                  <input
+                    id="otp"
+                    name="otp"
+                    type="text"
+                    required
+                    className="appearance-none rounded-b-md relative block w-full px-3 py-2 border border-gray-700 bg-gray-700 placeholder-gray-400 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                    placeholder="Enter OTP"
+                  />
+                </div>
+              )
             )}
           </div>
 
@@ -133,11 +140,12 @@ export default function LoginPage() {
                 onClick={() => {
                   setAuthMethod("password");
                   setOtpSent(false);
+                  setError(null);
                 }}
                 className={`text-sm ${
                   authMethod === "password"
-                    ? "text-indigo-600 font-medium"
-                    : "text-gray-500"
+                    ? "text-indigo-400 font-medium"
+                    : "text-gray-400 hover:text-gray-300"
                 }`}
               >
                 Password
@@ -147,11 +155,12 @@ export default function LoginPage() {
                 onClick={() => {
                   setAuthMethod("otp");
                   setOtpSent(false);
+                  setError(null);
                 }}
                 className={`text-sm ${
                   authMethod === "otp"
-                    ? "text-indigo-600 font-medium"
-                    : "text-gray-500"
+                    ? "text-indigo-400 font-medium"
+                    : "text-gray-400 hover:text-gray-300"
                 }`}
               >
                 OTP
@@ -173,10 +182,11 @@ export default function LoginPage() {
             </button>
           </div>
         </form>
-        <div className="text-center">
+
+        <div className="text-center space-y-2">
           <Link
             href="/register"
-            className="text-sm text-indigo-600 hover:text-indigo-500"
+            className="text-sm text-indigo-400 hover:text-indigo-300"
           >
             Don't have an account? Sign up
           </Link>

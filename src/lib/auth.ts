@@ -43,28 +43,28 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (!user) {
-          throw new Error("User not found");
+          throw new Error("Invalid email or password");
         }
 
-        // If OTP is provided, verify it
+        // Handle password authentication
+        if (credentials.password) {
+          if (!user.password) {
+            throw new Error("Password login is not enabled for this account");
+          }
+          const isValid = await compare(credentials.password, user.password);
+          if (!isValid) {
+            throw new Error("Invalid email or password");
+          }
+          return user;
+        }
+
+        // Handle OTP authentication
         if (credentials.otp) {
           if (!user.otp || user.otp !== credentials.otp) {
             throw new Error("Invalid OTP");
           }
           if (user.otpExpiry && user.otpExpiry < new Date()) {
             throw new Error("OTP has expired");
-          }
-          return user;
-        }
-
-        // If password is provided, verify it
-        if (credentials.password) {
-          if (!user.password) {
-            throw new Error("Password not set");
-          }
-          const isValid = await compare(credentials.password, user.password);
-          if (!isValid) {
-            throw new Error("Invalid password");
           }
           return user;
         }

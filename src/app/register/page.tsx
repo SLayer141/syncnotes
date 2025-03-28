@@ -39,6 +39,13 @@ export default function RegisterPage() {
         setStep("verification");
       } else {
         // Second step: Verify OTP and create account
+        if (!formData.name.trim()) {
+          throw new Error("Name is required");
+        }
+        if (!formData.password || formData.password.length < 8) {
+          throw new Error("Password must be at least 8 characters long");
+        }
+
         const response = await fetch("/api/auth/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -61,16 +68,16 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow">
+    <div className="min-h-screen flex items-center justify-center bg-gray-900">
+      <div className="max-w-md w-full space-y-8 p-8 bg-gray-800 rounded-lg shadow-lg">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-white">
             Create your account
           </h2>
         </div>
         <form className="mt-8 space-y-6" onSubmit={onSubmit}>
           {error && (
-            <div className="bg-red-50 text-red-500 p-3 rounded text-sm">
+            <div className="bg-red-900/50 text-red-200 p-3 rounded text-sm">
               {error}
             </div>
           )}
@@ -89,7 +96,7 @@ export default function RegisterPage() {
                   setFormData({ ...formData, email: e.target.value })
                 }
                 disabled={step === "verification"}
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                className="appearance-none rounded-t-md relative block w-full px-3 py-2 border border-gray-700 bg-gray-700 placeholder-gray-400 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm disabled:opacity-50"
                 placeholder="Email address"
               />
             </div>
@@ -108,7 +115,7 @@ export default function RegisterPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, name: e.target.value })
                     }
-                    className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                    className="appearance-none relative block w-full px-3 py-2 border border-gray-700 bg-gray-700 placeholder-gray-400 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                     placeholder="Full name"
                   />
                 </div>
@@ -121,12 +128,13 @@ export default function RegisterPage() {
                     name="password"
                     type="password"
                     required
+                    minLength={8}
                     value={formData.password}
                     onChange={(e) =>
                       setFormData({ ...formData, password: e.target.value })
                     }
-                    className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                    placeholder="Password"
+                    className="appearance-none relative block w-full px-3 py-2 border border-gray-700 bg-gray-700 placeholder-gray-400 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                    placeholder="Password (min. 8 characters)"
                   />
                 </div>
                 <div>
@@ -142,7 +150,7 @@ export default function RegisterPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, otp: e.target.value })
                     }
-                    className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                    className="appearance-none rounded-b-md relative block w-full px-3 py-2 border border-gray-700 bg-gray-700 placeholder-gray-400 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                     placeholder="Enter verification code"
                   />
                 </div>
@@ -164,10 +172,10 @@ export default function RegisterPage() {
             </button>
           </div>
         </form>
-        <div className="text-center">
+        <div className="text-center space-y-2">
           <Link
             href="/login"
-            className="text-sm text-indigo-600 hover:text-indigo-500"
+            className="text-sm text-indigo-400 hover:text-indigo-300"
           >
             Already have an account? Sign in
           </Link>

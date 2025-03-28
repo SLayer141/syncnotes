@@ -1,7 +1,7 @@
 interface Member {
   id: string;
   role: string;
-  createdAt: string;
+  joinedAt: string;
   user: {
     id: string;
     name: string | null;
@@ -24,6 +24,18 @@ export default function MembersTab({
   currentUserId,
   isAdmin,
 }: MembersTabProps) {
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return "N/A";
+    }
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
   return (
     <div className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
       <table className="min-w-full divide-y divide-gray-700">
@@ -86,7 +98,7 @@ export default function MembersTab({
                 )}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
-                {new Date(member.createdAt).toLocaleDateString()}
+                {formatDate(member.joinedAt)}
               </td>
               {isAdmin && member.user.id !== currentUserId && (
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

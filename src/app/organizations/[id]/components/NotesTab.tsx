@@ -29,6 +29,91 @@ interface NotesTabProps {
   userRole: string;
 }
 
+interface NoteModalProps {
+  note?: Note | null;
+  onClose: () => void;
+  onSubmit: (noteId: string | null, title: string, content: string, isShared: boolean) => void;
+  canShare: boolean;
+}
+
+function NoteModal({ note, onClose, onSubmit, canShare }: NoteModalProps) {
+  const [title, setTitle] = useState(note?.title || '');
+  const [content, setContent] = useState(note?.content || '');
+  const [isShared, setIsShared] = useState(note?.isShared || false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(note?.id || null, title, content, isShared);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-gray-800 p-6 rounded-lg shadow-xl max-w-2xl w-full mx-4">
+        <h2 className="text-xl font-semibold mb-4">
+          {note ? 'Edit Note' : 'Create Note'}
+        </h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="title" className="block text-sm font-medium text-gray-300">
+              Title
+            </label>
+            <input
+              type="text"
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+              className="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-indigo-500 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label htmlFor="content" className="block text-sm font-medium text-gray-300">
+              Content
+            </label>
+            <textarea
+              id="content"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              required
+              rows={8}
+              className="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-indigo-500 focus:ring-indigo-500"
+            />
+          </div>
+          {canShare && (
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="isShared"
+                checked={isShared}
+                onChange={(e) => setIsShared(e.target.checked)}
+                className="rounded bg-gray-700 border-gray-600 text-indigo-600 focus:ring-indigo-500"
+              />
+              <label htmlFor="isShared" className="ml-2 text-sm text-gray-300">
+                Share with all members
+              </label>
+            </div>
+          )}
+          <div className="flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 rounded-md hover:bg-gray-600"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
+            >
+              {note ? 'Save Changes' : 'Create Note'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function NotesTab({ organizationId, userRole }: NotesTabProps) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,7 +144,7 @@ export default function NotesTab({ organizationId, userRole }: NotesTabProps) {
     }
   };
 
-  const handleCreateNote = async (_noteId: string, title: string, content: string, isShared: boolean) => {
+  const handleCreateNote = async (noteId: string | null, title: string, content: string, isShared: boolean) => {
     try {
       const response = await fetch(`/api/organizations/${organizationId}/notes`, {
         method: 'POST',
@@ -83,7 +168,9 @@ export default function NotesTab({ organizationId, userRole }: NotesTabProps) {
     }
   };
 
-  const handleUpdateNote = async (noteId: string, title: string, content: string, isShared: boolean) => {
+  const handleUpdateNote = async (noteId: string | null, title: string, content: string, isShared: boolean) => {
+    if (!noteId) return;
+    
     try {
       const response = await fetch(`/api/organizations/${organizationId}/notes/${noteId}`, {
         method: 'PUT',
@@ -213,95 +300,6 @@ export default function NotesTab({ organizationId, userRole }: NotesTabProps) {
           canShare={userRole === 'ADMIN'}
         />
       )}
-    </div>
-  );
-}
-
-interface NoteModalProps {
-  note?: Note | null;
-  onClose: () => void;
-  onSubmit: (noteId: string, title: string, content: string, isShared: boolean) => void;
-  canShare: boolean;
-}
-
-function NoteModal({ note, onClose, onSubmit, canShare }: NoteModalProps) {
-  const [title, setTitle] = useState(note?.title || '');
-  const [content, setContent] = useState(note?.content || '');
-  const [isShared, setIsShared] = useState(note?.isShared || false);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit(note?.id || '', title, content, isShared);
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-2xl">
-        <h2 className="text-xl font-semibold text-white mb-4">
-          {note ? 'Edit Note' : 'Create Note'}
-        </h2>
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="title" className="block text-sm font-medium text-gray-300">
-              Title
-            </label>
-            <input
-              type="text"
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              className="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-indigo-500 focus:ring-indigo-500"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="content" className="block text-sm font-medium text-gray-300">
-              Content
-            </label>
-            <textarea
-              id="content"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              required
-              rows={6}
-              className="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-indigo-500 focus:ring-indigo-500"
-            />
-          </div>
-
-          {canShare && (
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="isShared"
-                checked={isShared}
-                onChange={(e) => setIsShared(e.target.checked)}
-                className="rounded bg-gray-700 border-gray-600 text-indigo-600 focus:ring-indigo-500"
-              />
-              <label htmlFor="isShared" className="ml-2 text-sm text-gray-300">
-                Share with viewers
-              </label>
-            </div>
-          )}
-
-          <div className="flex justify-end space-x-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 rounded-md hover:bg-gray-600"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
-            >
-              {note ? 'Save Changes' : 'Create Note'}
-            </button>
-          </div>
-        </form>
-      </div>
     </div>
   );
 } 
