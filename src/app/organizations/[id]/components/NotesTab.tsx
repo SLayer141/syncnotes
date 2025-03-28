@@ -27,6 +27,7 @@ interface Note {
 interface NotesTabProps {
   organizationId: string;
   userRole: string;
+  onNotesChange?: () => void;
 }
 
 interface NoteModalProps {
@@ -114,7 +115,7 @@ function NoteModal({ note, onClose, onSubmit, canShare }: NoteModalProps) {
   );
 }
 
-export default function NotesTab({ organizationId, userRole }: NotesTabProps) {
+export default function NotesTab({ organizationId, userRole, onNotesChange }: NotesTabProps) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -162,6 +163,7 @@ export default function NotesTab({ organizationId, userRole }: NotesTabProps) {
 
       setNotes([data, ...notes]);
       setShowCreateModal(false);
+      onNotesChange?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create note');
       console.error(err);
@@ -188,6 +190,7 @@ export default function NotesTab({ organizationId, userRole }: NotesTabProps) {
 
       setNotes(notes.map(note => note.id === noteId ? data : note));
       setEditingNote(null);
+      onNotesChange?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update note');
       console.error(err);
@@ -205,12 +208,14 @@ export default function NotesTab({ organizationId, userRole }: NotesTabProps) {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete note');
+        const data = await response.json();
+        throw new Error(data.message || 'Failed to delete note');
       }
 
       setNotes(notes.filter(note => note.id !== noteId));
+      onNotesChange?.();
     } catch (err) {
-      setError('Failed to delete note');
+      setError(err instanceof Error ? err.message : 'Failed to delete note');
       console.error(err);
     }
   };

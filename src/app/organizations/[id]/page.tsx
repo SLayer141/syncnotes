@@ -7,6 +7,7 @@ import Link from "next/link";
 import InviteForm from "@/components/InviteForm";
 import MembersTab from './components/MembersTab';
 import NotesTab from './components/NotesTab';
+import AdminDashboard from './components/AdminDashboard';
 
 interface Member {
   id: string;
@@ -222,44 +223,57 @@ export default function OrganizationPage() {
           </div>
         )}
 
-        <div className="border-b border-gray-800 mb-6">
-          <nav className="flex space-x-8">
-            <button
-              onClick={() => setActiveTab('members')}
-              className={`py-4 px-1 border-b-2 ${
-                activeTab === 'members'
-                  ? 'border-indigo-500 text-indigo-400'
-                  : 'border-transparent text-gray-400 hover:text-gray-300'
-              }`}
-            >
-              Members
-            </button>
-            <button
-              onClick={() => setActiveTab('notes')}
-              className={`py-4 px-1 border-b-2 ${
-                activeTab === 'notes'
-                  ? 'border-indigo-500 text-indigo-400'
-                  : 'border-transparent text-gray-400 hover:text-gray-300'
-              }`}
-            >
-              Notes
-            </button>
-          </nav>
-        </div>
-
-        {activeTab === 'members' ? (
-          <MembersTab
+        {isAdmin ? (
+          <AdminDashboard
+            organizationId={organization.id}
             members={organization.members}
-            onRemoveMember={handleRemoveMember}
             onUpdateRole={handleUpdateRole}
-            currentUserId={session?.user?.id}
-            isAdmin={isAdmin}
+            onRemoveMember={handleRemoveMember}
           />
         ) : (
-          <NotesTab
-            organizationId={organization.id}
-            userRole={organization.members.find(m => m.user.email === session?.user?.email)?.role || 'VIEWER'}
-          />
+          <div className="border-b border-gray-800 mb-6">
+            <nav className="flex space-x-8">
+              <button
+                onClick={() => setActiveTab('members')}
+                className={`py-4 px-1 border-b-2 ${
+                  activeTab === 'members'
+                    ? 'border-indigo-500 text-indigo-400'
+                    : 'border-transparent text-gray-400 hover:text-gray-300'
+                }`}
+              >
+                Members
+              </button>
+              <button
+                onClick={() => setActiveTab('notes')}
+                className={`py-4 px-1 border-b-2 ${
+                  activeTab === 'notes'
+                    ? 'border-indigo-500 text-indigo-400'
+                    : 'border-transparent text-gray-400 hover:text-gray-300'
+                }`}
+              >
+                Notes
+              </button>
+            </nav>
+          </div>
+        )}
+
+        {!isAdmin && (
+          <>
+            {activeTab === 'members' ? (
+              <MembersTab
+                members={organization.members}
+                onRemoveMember={handleRemoveMember}
+                onUpdateRole={handleUpdateRole}
+                currentUserId={session?.user?.id}
+                isAdmin={isAdmin}
+              />
+            ) : (
+              <NotesTab
+                organizationId={organization.id}
+                userRole={organization.members.find(m => m.user.email === session?.user?.email)?.role || 'VIEWER'}
+              />
+            )}
+          </>
         )}
 
         {showInviteForm && (
