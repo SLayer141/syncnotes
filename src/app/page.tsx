@@ -4,17 +4,25 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { getOrganizations, createOrganization } from "@/app/actions/organizations";
 
 interface Organization {
   id: string;
   name: string;
-  description?: string;
+  description: string | null;
+  createdAt: Date;
+  updatedAt: Date;
   members: Array<{
-    user: {
-      name: string;
-      email: string;
-    };
+    id: string;
+    userId: string;
+    organizationId: string;
     role: string;
+    joinedAt: Date;
+    user: {
+      id: string;
+      name: string | null;
+      email: string | null;
+    };
   }>;
 }
 
@@ -36,12 +44,11 @@ export default function HomePage() {
 
   async function loadOrganizations() {
     try {
-      const response = await fetch("/api/organizations");
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to load organizations");
+      const result = await getOrganizations();
+      if (result.error) {
+        throw new Error(result.error);
       }
-      setOrganizations(data);
+      setOrganizations(result.organizations || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load organizations");
     } finally {
@@ -58,17 +65,9 @@ export default function HomePage() {
     const description = formData.get("description") as string;
 
     try {
-      const response = await fetch("/api/organizations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ name, description }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to create organization");
+      const result = await createOrganization(name, description);
+      if (result.error) {
+        throw new Error(result.error);
       }
 
       setShowCreateForm(false);

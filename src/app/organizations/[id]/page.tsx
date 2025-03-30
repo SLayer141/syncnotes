@@ -1,18 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
-import { useRouter, useParams } from "next/navigation";
+import { useState, useEffect, use } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import Link from "next/link";
 import InviteForm from "@/components/InviteForm";
 import MembersTab from './components/MembersTab';
 import NotesTab from './components/NotesTab';
 import AdminDashboard from './components/AdminDashboard';
+import { getOrganization, updateOrganization, deleteOrganization } from '@/app/actions/organizations';
+import { inviteMember, updateMemberRole, removeMember } from '@/app/actions/organization-members';
+import { createActivityLog } from '@/app/actions/activity-logs';
+import InvitesTab from './components/InvitesTab';
 
 interface Member {
   id: string;
+  userId: string;
   role: string;
-  joinedAt: string;
+  joinedAt: Date;
   user: {
     id: string;
     name: string | null;
@@ -23,19 +28,20 @@ interface Member {
 interface Organization {
   id: string;
   name: string;
-  description?: string;
+  description: string | null;
+  createdAt: Date;
+  updatedAt: Date;
   members: Member[];
 }
 
-export default function OrganizationPage() {
+export default function OrganizationPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = use(params);
   const { data: session, status } = useSession();
   const router = useRouter();
-  const params = useParams();
   const [organization, setOrganization] = useState<Organization | null>(null);
-  const [activeTab, setActiveTab] = useState<"members" | "notes">("members");
+  const [activeTab, setActiveTab] = useState<'members' | 'notes' | 'admin' | 'invites'>('members');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [showInviteForm, setShowInviteForm] = useState(false);
 
   useEffect(() => {
@@ -44,142 +50,134 @@ export default function OrganizationPage() {
     } else if (status === "authenticated") {
       loadOrganization();
     }
-    console.log("Session status:", status);
-    console.log("Session data:", session);
-  }, [status, params.id]);
+  }, [status, resolvedParams.id]);
 
   async function loadOrganization() {
     try {
-      console.log("Loading organization with ID:", params.id);
-      const response = await fetch(`/api/organizations/${params.id}`);
-      const data = await response.json();
+      setIsLoading(true);
+      const result = await getOrganization(resolvedParams.id);
       
-      console.log("API Response:", { 
-        status: response.status, 
-        statusText: response.statusText,
-        data 
-      });
-      
-      if (!response.ok) {
-        throw new Error(data.message || `HTTP error! status: ${response.status}`);
+      if ('error' in result) {
+        throw new Error(result.error);
       }
       
-      if (!data || !data.id) {
-        throw new Error("Invalid organization data received");
-      }
+      // Ensure all members have the required fields
+      const organizationWithTypedMembers: Organization = {
+        ...result.organization,
+        members: result.organization.members.map(member => ({
+          id: member.id,
+          userId: member.userId,
+          role: member.role,
+          joinedAt: new Date(member.joinedAt),
+          user: member.user
+        }))
+      };
       
-      setOrganization(data);
-      // Check if current user is admin
-      const currentUserMember = data.members.find(
-        (member: Member) => member.user.email === session?.user?.email
-      );
-      setIsAdmin(currentUserMember?.role === "ADMIN");
+      setOrganization(organizationWithTypedMembers);
     } catch (err) {
-      console.error("Error loading organization:", {
-        error: err,
-        message: err instanceof Error ? err.message : "Unknown error",
-        params: params,
-        session: session
-      });
       setError(err instanceof Error ? err.message : "Failed to load organization");
+      console.error(err);
     } finally {
       setIsLoading(false);
     }
   }
 
   async function handleRemoveMember(memberId: string) {
-    if (!confirm("Are you sure you want to remove this member?")) {
-      return;
-    }
-
     try {
-      const response = await fetch(`/api/organizations/${params.id}/members/${memberId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || "Failed to remove member");
+      setError(null);
+      const result = await removeMember(memberId);
+      
+      if ('error' in result) {
+        throw new Error(result.error);
       }
-
-      loadOrganization();
+      
+      setOrganization(prev => ({
+        ...prev!,
+        members: prev!.members.filter(m => m.id !== memberId)
+      }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to remove member");
+      console.error(err);
+    }
+  }
+
+  async function handleUpdateRole(memberId: string, newRole: string) {
+    try {
+      setError(null);
+      const result = await updateMemberRole(memberId, newRole);
+      
+      if ('error' in result) {
+        throw new Error(result.error);
+      }
+      
+      setOrganization(prev => {
+        if (!prev) return prev;
+        const existingMember = prev.members.find(m => m.id === memberId);
+        if (!existingMember) return prev;
+        
+        return {
+          ...prev,
+          members: prev.members.map(m =>
+            m.id === memberId ? {
+              ...existingMember,
+              role: newRole
+            } : m
+          )
+        };
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update member role");
+      console.error(err);
     }
   }
 
   async function handleDeleteOrganization() {
-    if (!confirm("Are you sure you want to delete this organization? This action cannot be undone.")) {
+    if (!confirm('Are you sure you want to delete this organization?')) {
       return;
     }
 
     try {
       setError(null);
-      const response = await fetch(`/api/organizations/${params.id}`, {
-        method: "DELETE",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to delete organization");
+      const result = await deleteOrganization(organization!.id);
+      
+      if ('error' in result) {
+        throw new Error(result.error);
       }
-
-      // Use replace instead of push to prevent going back to deleted org
-      router.replace("/");
+      
+      router.push('/organizations');
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete organization");
-    }
-  }
-
-  const handleUpdateRole = async (memberId: string, newRole: string) => {
-    try {
-      const response = await fetch(`/api/organizations/${params.id}/members/${memberId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ role: newRole }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update role');
-      }
-
-      await loadOrganization();
-    } catch (err) {
-      setError('Failed to update member role');
       console.error(err);
     }
-  };
-
-  if (status === "loading" || isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
-        <div className="text-lg text-white">Loading...</div>
-      </div>
-    );
   }
 
-  if (!session) {
-    console.log("No session found");
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
-        <div className="text-lg text-white">Please log in to view this page.</div>
+      <div className="min-h-screen bg-gray-900 text-white p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-center min-h-[200px]">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (!organization) {
-    console.log("No organization data found");
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
-        <div className="text-lg text-white">
-          {error || "Organization not found"}
+      <div className="min-h-screen bg-gray-900 text-white p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="bg-red-900/50 text-red-200 p-4 rounded-md">
+            {error || "Organization not found"}
+          </div>
         </div>
       </div>
     );
   }
+
+  const currentUser = organization.members.find(m => m.userId === session?.user?.id);
+  const userRole = currentUser?.role || 'VIEWER';
+  const isAdmin = userRole === 'ADMIN';
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
@@ -187,9 +185,7 @@ export default function OrganizationPage() {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold">{organization.name}</h1>
-            {organization.description && (
-              <p className="text-gray-400 mt-2">{organization.description}</p>
-            )}
+            <p className="text-gray-400 mt-2">{organization.description}</p>
           </div>
           <div className="flex items-center space-x-4">
             <Link
@@ -223,66 +219,95 @@ export default function OrganizationPage() {
           </div>
         )}
 
-        {isAdmin ? (
-          <AdminDashboard
-            organizationId={organization.id}
-            members={organization.members}
-            onUpdateRole={handleUpdateRole}
-            onRemoveMember={handleRemoveMember}
-          />
-        ) : (
-          <div className="border-b border-gray-800 mb-6">
-            <nav className="flex space-x-8">
-              <button
-                onClick={() => setActiveTab('members')}
-                className={`py-4 px-1 border-b-2 ${
-                  activeTab === 'members'
-                    ? 'border-indigo-500 text-indigo-400'
-                    : 'border-transparent text-gray-400 hover:text-gray-300'
-                }`}
-              >
-                Members
-              </button>
-              <button
-                onClick={() => setActiveTab('notes')}
-                className={`py-4 px-1 border-b-2 ${
-                  activeTab === 'notes'
-                    ? 'border-indigo-500 text-indigo-400'
-                    : 'border-transparent text-gray-400 hover:text-gray-300'
-                }`}
-              >
-                Notes
-              </button>
-            </nav>
-          </div>
-        )}
-
-        {!isAdmin && (
-          <>
-            {activeTab === 'members' ? (
-              <MembersTab
-                members={organization.members}
-                onRemoveMember={handleRemoveMember}
-                onUpdateRole={handleUpdateRole}
-                currentUserId={session?.user?.id}
-                isAdmin={isAdmin}
-              />
-            ) : (
-              <NotesTab
-                organizationId={organization.id}
-                userRole={organization.members.find(m => m.user.email === session?.user?.email)?.role || 'VIEWER'}
-              />
+        <div className="bg-gray-800 rounded-lg p-6">
+          <div className="flex space-x-4 mb-6">
+            <button
+              onClick={() => setActiveTab('members')}
+              className={`px-4 py-2 rounded-md ${
+                activeTab === 'members'
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Members
+            </button>
+            <button
+              onClick={() => setActiveTab('notes')}
+              className={`px-4 py-2 rounded-md ${
+                activeTab === 'notes'
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Notes
+            </button>
+            {isAdmin && (
+              <>
+                <button
+                  onClick={() => setActiveTab('invites')}
+                  className={`px-4 py-2 rounded-md ${
+                    activeTab === 'invites'
+                      ? 'bg-indigo-600 text-white'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Invites
+                </button>
+                <button
+                  onClick={() => setActiveTab('admin')}
+                  className={`px-4 py-2 rounded-md ${
+                    activeTab === 'admin'
+                      ? 'bg-indigo-600 text-white'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Admin Dashboard
+                </button>
+              </>
             )}
-          </>
-        )}
+          </div>
+
+          {activeTab === 'members' && (
+            <MembersTab
+              members={organization.members}
+              userRole={userRole}
+              onUpdateRole={handleUpdateRole}
+              onRemoveMember={handleRemoveMember}
+            />
+          )}
+
+          {activeTab === 'notes' && (
+            <NotesTab
+              organizationId={organization.id}
+              userRole={userRole}
+            />
+          )}
+
+          {activeTab === 'invites' && isAdmin && (
+            <InvitesTab
+              organizationId={organization.id}
+              isAdmin={isAdmin}
+            />
+          )}
+
+          {activeTab === 'admin' && isAdmin && (
+            <AdminDashboard
+              organizationId={organization.id}
+              members={organization.members}
+              onMemberUpdate={(member) => handleUpdateRole(member.id, member.role)}
+              onMemberRemove={handleRemoveMember}
+            />
+          )}
+        </div>
 
         {showInviteForm && (
           <InviteForm
             organizationId={organization.id}
             organizationName={organization.name}
-            senderName={(session?.user?.name || session?.user?.email) ?? 'User'}
+            senderName={session?.user?.name || session?.user?.email || ''}
             onClose={() => setShowInviteForm(false)}
             onSuccess={() => {
+              setShowInviteForm(false);
               loadOrganization();
             }}
             isAdmin={isAdmin}

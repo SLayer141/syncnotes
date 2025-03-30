@@ -1,11 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { updateMemberRole, removeMember } from '@/app/actions/organization-members';
+import { getActivityLogs } from '@/app/actions/activity-logs';
+import { getNotes } from '@/app/actions/notes';
 import NotesTab from './NotesTab';
+import InvitesTab from './InvitesTab';
 
 interface Member {
   id: string;
+  userId: string;
   role: string;
-  joinedAt: string;
+  joinedAt: Date;
   user: {
     id: string;
     name: string | null;
@@ -18,9 +24,38 @@ interface Note {
   title: string;
   content: string;
   isShared: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: Date;
+  updatedAt: Date;
+  createdById: string;
+  organizationId: string;
   createdBy: {
+    id: string;
+    name: string | null;
+    email: string | null;
+  };
+  editHistory: {
+    id: string;
+    title: string;
+    content: string;
+    noteId: string;
+    editedById: string;
+    editedAt: Date;
+    editedBy: {
+      id: string;
+      name: string | null;
+      email: string | null;
+    };
+  }[];
+}
+
+interface ActivityLog {
+  id: string;
+  organizationId: string;
+  userId: string;
+  action: string;
+  details: string | null;
+  createdAt: Date;
+  user: {
     id: string;
     name: string | null;
     email: string | null;
@@ -30,44 +65,103 @@ interface Note {
 interface AdminDashboardProps {
   organizationId: string;
   members: Member[];
-  onUpdateRole: (memberId: string, newRole: string) => Promise<void>;
-  onRemoveMember: (memberId: string) => Promise<void>;
+  onMemberUpdate?: (member: Member) => void;
+  onMemberRemove?: (memberId: string) => void;
 }
 
-export default function AdminDashboard({ 
-  organizationId, 
-  members,
-  onUpdateRole,
-  onRemoveMember
-}: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'notes' | 'activity'>('overview');
+export default function AdminDashboard({ organizationId, members, onMemberUpdate, onMemberRemove }: AdminDashboardProps) {
+  const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'notes' | 'activity' | 'invites'>('overview');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { data: session } = useSession();
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
-  const [activityLogs, setActivityLogs] = useState<any[]>([]);
+  const { data: session } = useSession();
+  const router = useRouter();
 
-  // Fetch notes when the tab changes to 'notes' or 'overview' (for stats)
   useEffect(() => {
-    if (activeTab === 'notes' || activeTab === 'overview') {
+    if (activeTab === 'activity') {
+      fetchActivityLogs();
+    } else if (activeTab === 'notes') {
       fetchNotes();
     }
   }, [activeTab]);
 
-  const fetchNotes = async () => {
+  const fetchActivityLogs = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/organizations/${organizationId}/notes`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch notes');
+      const result = await getActivityLogs(organizationId);
+      
+      if ('error' in result) {
+        throw new Error(result.error);
       }
-      const data = await response.json();
-      setNotes(data);
+      
+      setActivityLogs(result.logs);
     } catch (err) {
-      setError('Failed to load notes');
+      setError(err instanceof Error ? err.message : 'Failed to load activity logs');
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchNotes = async () => {
+    try {
+      setLoading(true);
+      const result = await getNotes(organizationId);
+      
+      if ('error' in result) {
+        throw new Error(result.error);
+      }
+      
+      setNotes(result.notes);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load notes');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateRole = async (memberId: string, newRole: string) => {
+    try {
+      const result = await updateMemberRole(memberId, newRole);
+      
+      if ('error' in result) {
+        throw new Error(result.error);
+      }
+      
+      // Ensure the member object has all required fields
+      const updatedMember: Member = {
+        id: result.member.id,
+        userId: result.member.userId,
+        role: result.member.role,
+        joinedAt: new Date(result.member.joinedAt),
+        user: result.member.user
+      };
+      
+      onMemberUpdate?.(updatedMember);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update member role');
+      console.error(err);
+    }
+  };
+
+  const handleRemoveMember = async (memberId: string) => {
+    if (!confirm('Are you sure you want to remove this member?')) {
+      return;
+    }
+
+    try {
+      const result = await removeMember(memberId);
+      
+      if ('error' in result) {
+        throw new Error(result.error);
+      }
+      
+      onMemberRemove?.(memberId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove member');
+      console.error(err);
     }
   };
 
@@ -126,6 +220,16 @@ export default function AdminDashboard({
           >
             Activity Log
           </button>
+          <button
+            onClick={() => setActiveTab('invites')}
+            className={`py-4 px-1 border-b-2 ${
+              activeTab === 'invites'
+                ? 'border-indigo-500 text-indigo-400'
+                : 'border-transparent text-gray-400 hover:text-gray-300'
+            }`}
+          >
+            Invites
+          </button>
         </nav>
       </div>
 
@@ -175,56 +279,52 @@ export default function AdminDashboard({
         )}
 
         {activeTab === 'members' && (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-800">
-              <thead>
+          <div className="bg-gray-800 rounded-lg overflow-hidden">
+            <table className="min-w-full divide-y divide-gray-700">
+              <thead className="bg-gray-700">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                    User
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                    Role
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                    Joined
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                    Actions
-                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Email</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Role</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Joined</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-800">
+              <tbody className="bg-gray-800 divide-y divide-gray-700">
                 {members.map((member) => (
                   <tr key={member.id}>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-white">
-                          {member.user.name || 'Unnamed User'}
-                        </div>
-                        <div className="text-sm text-gray-400">{member.user.email}</div>
-                      </div>
+                      <div className="text-sm font-medium text-white">{member.user.name}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-300">{member.user.email}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <select
                         value={member.role}
-                        onChange={(e) => onUpdateRole(member.id, e.target.value)}
+                        onChange={(e) => handleUpdateRole(member.id, e.target.value)}
                         className="bg-gray-700 text-white text-sm rounded-md border-gray-600 focus:border-indigo-500 focus:ring-indigo-500"
+                        disabled={member.userId === session?.user?.id}
                       >
                         <option value="ADMIN">Admin</option>
                         <option value="MEMBER">Member</option>
                         <option value="VIEWER">Viewer</option>
                       </select>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
-                      {new Date(member.joinedAt).toLocaleDateString()}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-300">
+                        {new Date(member.joinedAt).toLocaleDateString()}
+                      </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
-                      <button
-                        onClick={() => onRemoveMember(member.id)}
-                        className="text-red-400 hover:text-red-300"
-                      >
-                        Remove
-                      </button>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      {member.userId !== session?.user?.id && (
+                        <button
+                          onClick={() => handleRemoveMember(member.id)}
+                          className="text-red-400 hover:text-red-300"
+                        >
+                          Remove
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -237,14 +337,62 @@ export default function AdminDashboard({
           <NotesTab
             organizationId={organizationId}
             userRole="ADMIN"
-            onNotesChange={fetchNotes}
           />
         )}
 
         {activeTab === 'activity' && (
-          <div className="bg-gray-800 rounded-lg p-6">
-            <p className="text-gray-400">Activity log coming soon...</p>
+          <div className="bg-gray-800 rounded-lg overflow-hidden">
+            <table className="min-w-full divide-y divide-gray-700">
+              <thead className="bg-gray-700">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">User</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Action</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Details</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Time</th>
+                </tr>
+              </thead>
+              <tbody className="bg-gray-800 divide-y divide-gray-700">
+                {activityLogs.map((log) => (
+                  <tr key={log.id} className="hover:bg-gray-700 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div>
+                          <div className="text-sm font-medium text-indigo-400">{log.user.name}</div>
+                          <div className="text-sm text-gray-400">{log.user.email}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        log.action.includes('Created') ? 'bg-green-100 text-green-800' :
+                        log.action.includes('Updated') ? 'bg-blue-100 text-blue-800' :
+                        log.action.includes('Deleted') ? 'bg-red-100 text-red-800' :
+                        log.action.includes('Joined') ? 'bg-purple-100 text-purple-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {log.action}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-300">{log.details}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-400">
+                        {new Date(log.createdAt).toLocaleString()}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+        )}
+
+        {activeTab === 'invites' && (
+          <InvitesTab 
+            organizationId={organizationId} 
+            isAdmin={true} 
+          />
         )}
       </div>
     </div>

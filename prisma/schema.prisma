@@ -30,6 +30,8 @@ model User {
   createdNotes      Note[]             @relation("CreatedNotes")
   editedNotes       NoteEdit[]         @relation("EditedNotes")
   activities        ActivityLog[]
+  sentInvitations   Invitation[]       @relation("InvitedBy")
+  receivedInvitations Invitation[]       @relation("InvitedUser")
 
   @@map("users")
 }
@@ -43,6 +45,7 @@ model Organization {
   members     OrganizationMember[]
   notes       Note[]
   activities  ActivityLog[]
+  invitations Invitation[]
 }
 
 model OrganizationMember {
@@ -132,4 +135,24 @@ model Session {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+model Invitation {
+  id            String   @id @default(cuid())
+  organizationId String
+  invitedById   String
+  invitedUserId String
+  status        String   @default("PENDING") // PENDING, ACCEPTED, EXPIRED
+  role          String   @default("MEMBER") // ADMIN, MEMBER, VIEWER
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  organization  Organization @relation(fields: [organizationId], references: [id])
+  invitedBy     User        @relation("InvitedBy", fields: [invitedById], references: [id])
+  invitedUser   User        @relation("InvitedUser", fields: [invitedUserId], references: [id])
+
+  @@index([organizationId])
+  @@index([invitedById])
+  @@index([invitedUserId])
 }

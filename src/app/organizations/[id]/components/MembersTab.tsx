@@ -1,7 +1,11 @@
+import { useState } from 'react';
+import { useSession } from 'next-auth/react';
+
 interface Member {
   id: string;
+  userId: string;
   role: string;
-  joinedAt: string;
+  joinedAt: Date;
   user: {
     id: string;
     name: string | null;
@@ -11,22 +15,20 @@ interface Member {
 
 interface MembersTabProps {
   members: Member[];
+  userRole: string;
   onRemoveMember: (memberId: string) => void;
   onUpdateRole: (memberId: string, newRole: string) => void;
-  currentUserId: string | undefined;
-  isAdmin: boolean;
 }
 
 export default function MembersTab({
   members,
+  userRole,
   onRemoveMember,
   onUpdateRole,
-  currentUserId,
-  isAdmin,
 }: MembersTabProps) {
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) {
+  const { data: session } = useSession();
+  const formatDate = (date: Date) => {
+    if (!(date instanceof Date) || isNaN(date.getTime())) {
       return "N/A";
     }
     return date.toLocaleDateString('en-US', {
@@ -35,6 +37,8 @@ export default function MembersTab({
       day: 'numeric'
     });
   };
+
+  const isAdmin = userRole === 'ADMIN';
 
   return (
     <div className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
@@ -73,11 +77,12 @@ export default function MembersTab({
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                {isAdmin && member.user.id !== currentUserId ? (
+                {isAdmin ? (
                   <select
                     value={member.role}
                     onChange={(e) => onUpdateRole(member.id, e.target.value)}
-                    className="bg-gray-700 border-gray-600 text-white rounded-md text-sm"
+                    className="bg-gray-700 text-white text-sm rounded-md border-gray-600 focus:border-indigo-500 focus:ring-indigo-500"
+                    disabled={member.userId === session?.user?.id}
                   >
                     <option value="ADMIN">Admin</option>
                     <option value="MEMBER">Member</option>
@@ -100,7 +105,7 @@ export default function MembersTab({
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
                 {formatDate(member.joinedAt)}
               </td>
-              {isAdmin && member.user.id !== currentUserId && (
+              {isAdmin && (
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button
                     onClick={() => onRemoveMember(member.id)}

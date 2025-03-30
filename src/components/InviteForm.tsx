@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { inviteMember } from "@/app/actions/organization-members";
 
 interface InviteFormProps {
   organizationId: string;
@@ -35,23 +36,10 @@ export default function InviteForm({
     setError(null);
 
     try {
-      const response = await fetch(`/api/organizations/${organizationId}/invite`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email,
-          role,
-          organizationName,
-          senderName,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to send invite");
+      const result = await inviteMember(organizationId, email, role);
+      
+      if ('error' in result) {
+        throw new Error(result.error);
       }
 
       onSuccess();
@@ -100,12 +88,11 @@ export default function InviteForm({
               id="role"
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              required
               className="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-indigo-500 focus:ring-indigo-500"
             >
-              <option value="VIEWER">Viewer (Can only view)</option>
-              <option value="MEMBER">Member (Can view and edit)</option>
-              <option value="ADMIN">Admin (Full control)</option>
+              <option value="ADMIN">Admin</option>
+              <option value="MEMBER">Member</option>
+              <option value="VIEWER">Viewer</option>
             </select>
           </div>
 

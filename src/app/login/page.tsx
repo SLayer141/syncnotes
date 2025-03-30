@@ -4,10 +4,13 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
+import { sendOTP } from "@/app/actions/auth";
 
 export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [authMethod, setAuthMethod] = useState<"password" | "otp">("password");
   const [otpSent, setOtpSent] = useState(false);
@@ -16,6 +19,8 @@ export default function LoginPage() {
     event.preventDefault();
     setIsLoading(true);
     setError(null);
+    setMessage(null);
+    setPreviewUrl(null);
 
     const formData = new FormData(event.currentTarget);
     const email = formData.get("email") as string;
@@ -24,19 +29,19 @@ export default function LoginPage() {
       if (authMethod === "otp") {
         if (!otpSent) {
           // Send OTP
-          const response = await fetch("/api/auth/send-otp", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, type: "otp" }),
-          });
+          const result = await sendOTP(email);
 
-          const data = await response.json();
-
-          if (!response.ok) {
-            throw new Error(data.message || "Failed to send OTP");
+          if ('error' in result) {
+            throw new Error(result.error + (result.details ? `\n${result.details}` : ''));
           }
 
           setOtpSent(true);
+          if (result.message) {
+            setMessage(result.message);
+          }
+          if (result.previewUrl) {
+            setPreviewUrl(result.previewUrl);
+          }
           setIsLoading(false);
           return;
         }
@@ -84,6 +89,23 @@ export default function LoginPage() {
           {error && (
             <div className="bg-red-900/50 text-red-200 p-3 rounded text-sm">
               {error}
+            </div>
+          )}
+          {message && (
+            <div className="bg-blue-900/50 text-blue-200 p-3 rounded text-sm">
+              {message}
+              {previewUrl && (
+                <div className="mt-2">
+                  <a 
+                    href={previewUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:text-blue-300 underline"
+                  >
+                    Click here to view the test email
+                  </a>
+                </div>
+              )}
             </div>
           )}
           <div className="rounded-md shadow-sm -space-y-px">
@@ -141,6 +163,8 @@ export default function LoginPage() {
                   setAuthMethod("password");
                   setOtpSent(false);
                   setError(null);
+                  setMessage(null);
+                  setPreviewUrl(null);
                 }}
                 className={`text-sm ${
                   authMethod === "password"
@@ -156,6 +180,8 @@ export default function LoginPage() {
                   setAuthMethod("otp");
                   setOtpSent(false);
                   setError(null);
+                  setMessage(null);
+                  setPreviewUrl(null);
                 }}
                 className={`text-sm ${
                   authMethod === "otp"

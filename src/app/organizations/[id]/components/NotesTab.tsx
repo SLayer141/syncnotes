@@ -1,26 +1,34 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { getNotes, createNote, updateNote, deleteNote } from '@/app/actions/notes';
 
 interface Note {
   id: string;
   title: string;
   content: string;
   isShared: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: Date;
+  updatedAt: Date;
+  organizationId: string;
+  createdById: string;
   createdBy: {
     id: string;
     name: string | null;
     email: string | null;
   };
-  editHistory: {
+  editHistory?: {
+    id: string;
+    noteId: string;
+    editedById: string;
+    title: string;
+    content: string;
+    editedAt: Date;
     editedBy: {
       id: string;
       name: string | null;
       email: string | null;
     };
-    editedAt: string;
   }[];
 }
 
@@ -131,14 +139,16 @@ export default function NotesTab({ organizationId, userRole, onNotesChange }: No
 
   const fetchNotes = async () => {
     try {
-      const response = await fetch(`/api/organizations/${organizationId}/notes`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch notes');
+      setLoading(true);
+      const result = await getNotes(organizationId);
+      
+      if ('error' in result) {
+        throw new Error(result.error);
       }
-      const data = await response.json();
-      setNotes(data);
+      
+      setNotes(result.notes);
     } catch (err) {
-      setError('Failed to load notes');
+      setError(err instanceof Error ? err.message : 'Failed to load notes');
       console.error(err);
     } finally {
       setLoading(false);
@@ -147,21 +157,19 @@ export default function NotesTab({ organizationId, userRole, onNotesChange }: No
 
   const handleCreateNote = async (noteId: string | null, title: string, content: string, isShared: boolean) => {
     try {
-      const response = await fetch(`/api/organizations/${organizationId}/notes`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ title, content, isShared }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to create note');
+      const result = await createNote(organizationId, title, content);
+      
+      if ('error' in result) {
+        throw new Error(result.error);
       }
-
-      setNotes([data, ...notes]);
+      
+      const newNote: Note = {
+        ...result.note,
+        isShared: false,
+        editHistory: [],
+      };
+      
+      setNotes([newNote, ...notes]);
       setShowCreateModal(false);
       onNotesChange?.();
     } catch (err) {
@@ -174,21 +182,18 @@ export default function NotesTab({ organizationId, userRole, onNotesChange }: No
     if (!noteId) return;
     
     try {
-      const response = await fetch(`/api/organizations/${organizationId}/notes/${noteId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ title, content, isShared }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to update note');
+      const result = await updateNote(noteId, title, content);
+      
+      if ('error' in result) {
+        throw new Error(result.error);
       }
-
-      setNotes(notes.map(note => note.id === noteId ? data : note));
+      
+      const updatedNote: Note = {
+        ...result.note,
+        isShared,
+      };
+      
+      setNotes(notes.map(note => note.id === noteId ? updatedNote : note));
       setEditingNote(null);
       onNotesChange?.();
     } catch (err) {
@@ -203,15 +208,12 @@ export default function NotesTab({ organizationId, userRole, onNotesChange }: No
     }
 
     try {
-      const response = await fetch(`/api/organizations/${organizationId}/notes/${noteId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to delete note');
+      const result = await deleteNote(noteId);
+      
+      if ('error' in result) {
+        throw new Error(result.error);
       }
-
+      
       setNotes(notes.filter(note => note.id !== noteId));
       onNotesChange?.();
     } catch (err) {
