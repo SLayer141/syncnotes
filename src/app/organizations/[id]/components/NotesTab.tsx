@@ -8,6 +8,7 @@ interface Note {
   title: string;
   content: string;
   isShared: boolean;
+  sharedWithRoles: string[];
   createdAt: Date;
   updatedAt: Date;
   organizationId: string;
@@ -41,7 +42,7 @@ interface NotesTabProps {
 interface NoteModalProps {
   note?: Note | null;
   onClose: () => void;
-  onSubmit: (noteId: string | null, title: string, content: string, isShared: boolean) => void;
+  onSubmit: (noteId: string | null, title: string, content: string, isShared: boolean, sharedWithRoles: string[]) => void;
   canShare: boolean;
 }
 
@@ -49,10 +50,23 @@ function NoteModal({ note, onClose, onSubmit, canShare }: NoteModalProps) {
   const [title, setTitle] = useState(note?.title || '');
   const [content, setContent] = useState(note?.content || '');
   const [isShared, setIsShared] = useState(note?.isShared || false);
+  const [sharedWithRoles, setSharedWithRoles] = useState<string[]>(note?.sharedWithRoles || []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(note?.id || null, title, content, isShared);
+    onSubmit(note?.id || null, title, content, isShared, sharedWithRoles);
+  };
+
+  const handleRoleToggle = (role: string) => {
+    setSharedWithRoles(prev => {
+      if (prev.includes(role)) {
+        return prev.filter(r => r !== role);
+      } else {
+        return [...prev, role];
+      }
+    });
+    // If any role is selected, set isShared to true
+    setIsShared(true);
   };
 
   return (
@@ -88,20 +102,31 @@ function NoteModal({ note, onClose, onSubmit, canShare }: NoteModalProps) {
               className="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-indigo-500 focus:ring-indigo-500"
             />
           </div>
+          
           {canShare && (
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="isShared"
-                checked={isShared}
-                onChange={(e) => setIsShared(e.target.checked)}
-                className="rounded bg-gray-700 border-gray-600 text-indigo-600 focus:ring-indigo-500"
-              />
-              <label htmlFor="isShared" className="ml-2 text-sm text-gray-300">
-                Share with all members
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-300">
+                Share with:
               </label>
+              <div className="space-y-2">
+                {['ADMIN', 'MEMBER', 'VIEWER'].map((role) => (
+                  <div key={role} className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id={`role-${role}`}
+                      checked={sharedWithRoles.includes(role)}
+                      onChange={() => handleRoleToggle(role)}
+                      className="rounded bg-gray-700 border-gray-600 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <label htmlFor={`role-${role}`} className="ml-2 text-sm text-gray-300">
+                      {role.charAt(0) + role.slice(1).toLowerCase()}s
+                    </label>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
+
           <div className="flex justify-end space-x-3">
             <button
               type="button"
@@ -155,21 +180,15 @@ export default function NotesTab({ organizationId, userRole, onNotesChange }: No
     }
   };
 
-  const handleCreateNote = async (noteId: string | null, title: string, content: string, isShared: boolean) => {
+  const handleCreateNote = async (noteId: string | null, title: string, content: string, isShared: boolean, sharedWithRoles: string[]) => {
     try {
-      const result = await createNote(organizationId, title, content);
+      const result = await createNote(organizationId, title, content, sharedWithRoles);
       
       if ('error' in result) {
         throw new Error(result.error);
       }
       
-      const newNote: Note = {
-        ...result.note,
-        isShared: false,
-        editHistory: [],
-      };
-      
-      setNotes([newNote, ...notes]);
+      setNotes([result.note, ...notes]);
       setShowCreateModal(false);
       onNotesChange?.();
     } catch (err) {
@@ -178,22 +197,17 @@ export default function NotesTab({ organizationId, userRole, onNotesChange }: No
     }
   };
 
-  const handleUpdateNote = async (noteId: string | null, title: string, content: string, isShared: boolean) => {
+  const handleUpdateNote = async (noteId: string | null, title: string, content: string, isShared: boolean, sharedWithRoles: string[]) => {
     if (!noteId) return;
     
     try {
-      const result = await updateNote(noteId, title, content);
+      const result = await updateNote(noteId, title, content, sharedWithRoles);
       
       if ('error' in result) {
         throw new Error(result.error);
       }
       
-      const updatedNote: Note = {
-        ...result.note,
-        isShared,
-      };
-      
-      setNotes(notes.map(note => note.id === noteId ? updatedNote : note));
+      setNotes(notes.map(note => note.id === noteId ? result.note : note));
       setEditingNote(null);
       onNotesChange?.();
     } catch (err) {
@@ -230,6 +244,12 @@ export default function NotesTab({ organizationId, userRole, onNotesChange }: No
     );
   }
 
+  const canEditNote = (note: Note) => {
+    if (userRole === 'ADMIN') return true;
+    if (userRole === 'MEMBER' && note.createdById === session?.user?.id) return true;
+    return false;
+  };
+
   return (
     <div className="space-y-6">
       {error && (
@@ -260,9 +280,16 @@ export default function NotesTab({ organizationId, userRole, onNotesChange }: No
             <div className="flex justify-between items-start">
               <h3 className="text-xl font-semibold text-white">{note.title}</h3>
               {note.isShared && (
-                <span className="bg-green-600/20 text-green-400 text-xs px-2 py-1 rounded">
-                  Shared
-                </span>
+                <div className="flex flex-wrap gap-1">
+                  {note.sharedWithRoles.map((role) => (
+                    <span
+                      key={role}
+                      className="bg-green-600/20 text-green-400 text-xs px-2 py-1 rounded"
+                    >
+                      {role.charAt(0) + role.slice(1).toLowerCase()}
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
             
@@ -275,7 +302,7 @@ export default function NotesTab({ organizationId, userRole, onNotesChange }: No
             </div>
 
             {/* Actions */}
-            {(userRole === 'ADMIN' || (userRole === 'MEMBER' && note.createdBy.id === session?.user?.id)) && (
+            {canEditNote(note) && (
               <div className="flex justify-end space-x-3 pt-4 border-t border-gray-700">
                 <button
                   onClick={() => setEditingNote(note)}

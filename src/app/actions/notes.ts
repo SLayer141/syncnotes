@@ -14,19 +14,57 @@ export async function getNotes(organizationId: string) {
       throw new Error("Not authenticated");
     }
 
-    const notes = await prisma.note.findMany({
+    // Get the user and their role in the organization
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const member = await prisma.organizationMember.findUnique({
       where: {
-        organizationId,
-        organization: {
-          members: {
-            some: {
-              user: {
-                email: session.user.email,
-              },
-            },
-          },
+        organizationId_userId: {
+          organizationId,
+          userId: user.id,
         },
       },
+    });
+
+    if (!member) {
+      throw new Error("You don't have access to this organization");
+    }
+
+    // Build the where clause based on user role
+    let whereClause: any = {
+      organizationId,
+    };
+
+    // If not an admin, add role-based filters
+    if (member.role !== 'ADMIN') {
+      if (member.role === 'MEMBER') {
+        // Members can see their own notes and notes shared with MEMBER role
+        whereClause.OR = [
+          { createdById: user.id },
+          {
+            AND: [
+              { isShared: true },
+              { sharedWithRoles: { has: 'MEMBER' } }
+            ]
+          }
+        ];
+      } else if (member.role === 'VIEWER') {
+        // Viewers can only see notes shared with VIEWER role
+        whereClause.AND = [
+          { isShared: true },
+          { sharedWithRoles: { has: 'VIEWER' } }
+        ];
+      }
+    }
+
+    const notes = await prisma.note.findMany({
+      where: whereClause,
       include: {
         createdBy: {
           select: {
@@ -61,7 +99,12 @@ export async function getNotes(organizationId: string) {
   }
 }
 
-export async function createNote(organizationId: string, title: string, content: string) {
+export async function createNote(
+  organizationId: string,
+  title: string,
+  content: string,
+  sharedWithRoles: string[] = []
+) {
   try {
     const session = await getServerSession(authOptions);
 
@@ -97,6 +140,8 @@ export async function createNote(organizationId: string, title: string, content:
         content,
         organizationId,
         createdById: user.id,
+        isShared: sharedWithRoles.length > 0,
+        sharedWithRoles,
       },
       include: {
         createdBy: {
@@ -119,7 +164,12 @@ export async function createNote(organizationId: string, title: string, content:
   }
 }
 
-export async function updateNote(noteId: string, title: string, content: string) {
+export async function updateNote(
+  noteId: string,
+  title: string,
+  content: string,
+  sharedWithRoles: string[] = []
+) {
   try {
     const session = await getServerSession(authOptions);
 
@@ -156,6 +206,11 @@ export async function updateNote(noteId: string, title: string, content: string)
       throw new Error("You don't have access to this note");
     }
 
+    // Only allow sharing if user is an admin
+    const canShare = member.role === 'ADMIN';
+    const updatedSharedWithRoles = canShare ? sharedWithRoles : note.sharedWithRoles;
+    const isShared = updatedSharedWithRoles.length > 0;
+
     // Create edit history entry
     await prisma.noteEdit.create({
       data: {
@@ -172,6 +227,8 @@ export async function updateNote(noteId: string, title: string, content: string)
       data: {
         title,
         content,
+        isShared,
+        sharedWithRoles: updatedSharedWithRoles,
       },
       include: {
         createdBy: {

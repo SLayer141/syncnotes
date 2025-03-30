@@ -4,8 +4,6 @@ import { useRouter } from 'next/navigation';
 import { updateMemberRole, removeMember } from '@/app/actions/organization-members';
 import { getActivityLogs } from '@/app/actions/activity-logs';
 import { getNotes } from '@/app/actions/notes';
-import NotesTab from './NotesTab';
-import InvitesTab from './InvitesTab';
 
 interface Member {
   id: string;
@@ -70,7 +68,7 @@ interface AdminDashboardProps {
 }
 
 export default function AdminDashboard({ organizationId, members, onMemberUpdate, onMemberRemove }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'notes' | 'activity' | 'invites'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'activity'>('overview');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
@@ -81,9 +79,9 @@ export default function AdminDashboard({ organizationId, members, onMemberUpdate
   useEffect(() => {
     if (activeTab === 'activity') {
       fetchActivityLogs();
-    } else if (activeTab === 'notes') {
-      fetchNotes();
     }
+    // Always fetch notes for the stats
+    fetchNotes();
   }, [activeTab]);
 
   const fetchActivityLogs = async () => {
@@ -106,7 +104,6 @@ export default function AdminDashboard({ organizationId, members, onMemberUpdate
 
   const fetchNotes = async () => {
     try {
-      setLoading(true);
       const result = await getNotes(organizationId);
       
       if ('error' in result) {
@@ -116,51 +113,6 @@ export default function AdminDashboard({ organizationId, members, onMemberUpdate
       setNotes(result.notes);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load notes');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUpdateRole = async (memberId: string, newRole: string) => {
-    try {
-      const result = await updateMemberRole(memberId, newRole);
-      
-      if ('error' in result) {
-        throw new Error(result.error);
-      }
-      
-      // Ensure the member object has all required fields
-      const updatedMember: Member = {
-        id: result.member.id,
-        userId: result.member.userId,
-        role: result.member.role,
-        joinedAt: new Date(result.member.joinedAt),
-        user: result.member.user
-      };
-      
-      onMemberUpdate?.(updatedMember);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update member role');
-      console.error(err);
-    }
-  };
-
-  const handleRemoveMember = async (memberId: string) => {
-    if (!confirm('Are you sure you want to remove this member?')) {
-      return;
-    }
-
-    try {
-      const result = await removeMember(memberId);
-      
-      if ('error' in result) {
-        throw new Error(result.error);
-      }
-      
-      onMemberRemove?.(memberId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to remove member');
       console.error(err);
     }
   };
@@ -191,26 +143,6 @@ export default function AdminDashboard({ organizationId, members, onMemberUpdate
             Overview
           </button>
           <button
-            onClick={() => setActiveTab('members')}
-            className={`py-4 px-1 border-b-2 ${
-              activeTab === 'members'
-                ? 'border-indigo-500 text-indigo-400'
-                : 'border-transparent text-gray-400 hover:text-gray-300'
-            }`}
-          >
-            Members
-          </button>
-          <button
-            onClick={() => setActiveTab('notes')}
-            className={`py-4 px-1 border-b-2 ${
-              activeTab === 'notes'
-                ? 'border-indigo-500 text-indigo-400'
-                : 'border-transparent text-gray-400 hover:text-gray-300'
-            }`}
-          >
-            Notes
-          </button>
-          <button
             onClick={() => setActiveTab('activity')}
             className={`py-4 px-1 border-b-2 ${
               activeTab === 'activity'
@@ -219,16 +151,6 @@ export default function AdminDashboard({ organizationId, members, onMemberUpdate
             }`}
           >
             Activity Log
-          </button>
-          <button
-            onClick={() => setActiveTab('invites')}
-            className={`py-4 px-1 border-b-2 ${
-              activeTab === 'invites'
-                ? 'border-indigo-500 text-indigo-400'
-                : 'border-transparent text-gray-400 hover:text-gray-300'
-            }`}
-          >
-            Invites
           </button>
         </nav>
       </div>
@@ -278,68 +200,6 @@ export default function AdminDashboard({ organizationId, members, onMemberUpdate
           </div>
         )}
 
-        {activeTab === 'members' && (
-          <div className="bg-gray-800 rounded-lg overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-700">
-              <thead className="bg-gray-700">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Role</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Joined</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-gray-800 divide-y divide-gray-700">
-                {members.map((member) => (
-                  <tr key={member.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-white">{member.user.name}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-300">{member.user.email}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <select
-                        value={member.role}
-                        onChange={(e) => handleUpdateRole(member.id, e.target.value)}
-                        className="bg-gray-700 text-white text-sm rounded-md border-gray-600 focus:border-indigo-500 focus:ring-indigo-500"
-                        disabled={member.userId === session?.user?.id}
-                      >
-                        <option value="ADMIN">Admin</option>
-                        <option value="MEMBER">Member</option>
-                        <option value="VIEWER">Viewer</option>
-                      </select>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-300">
-                        {new Date(member.joinedAt).toLocaleDateString()}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      {member.userId !== session?.user?.id && (
-                        <button
-                          onClick={() => handleRemoveMember(member.id)}
-                          className="text-red-400 hover:text-red-300"
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {activeTab === 'notes' && (
-          <NotesTab
-            organizationId={organizationId}
-            userRole="ADMIN"
-          />
-        )}
-
         {activeTab === 'activity' && (
           <div className="bg-gray-800 rounded-lg overflow-hidden">
             <table className="min-w-full divide-y divide-gray-700">
@@ -386,13 +246,6 @@ export default function AdminDashboard({ organizationId, members, onMemberUpdate
               </tbody>
             </table>
           </div>
-        )}
-
-        {activeTab === 'invites' && (
-          <InvitesTab 
-            organizationId={organizationId} 
-            isAdmin={true} 
-          />
         )}
       </div>
     </div>

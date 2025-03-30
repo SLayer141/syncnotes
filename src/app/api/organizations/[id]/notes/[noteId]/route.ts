@@ -23,7 +23,24 @@ async function checkUserPermissions(organizationId: string, userId: string) {
 
 // Helper function to check if user can edit note
 async function canEditNote(note: any, userId: string, role: string) {
-  return role === "ADMIN" || (role === "MEMBER" && note.createdById === userId);
+  if (role === "ADMIN") return true;
+  if (role === "MEMBER" && note.createdById === userId) return true;
+  if (role === "VIEWER") {
+    const sharedWithRoles = note.sharedWithRoles || [];
+    return sharedWithRoles.includes(role);
+  }
+  return false;
+}
+
+// Helper function to check if user can view note
+async function canViewNote(note: any, role: string) {
+  if (role === "ADMIN" || role === "MEMBER") return true;
+  if (role === "VIEWER") {
+    if (!note.isShared) return false;
+    const sharedWithRoles = note.sharedWithRoles || [];
+    return sharedWithRoles.includes(role);
+  }
+  return false;
 }
 
 export async function GET(
@@ -94,7 +111,8 @@ export async function GET(
       );
     }
 
-    if (role === "VIEWER" && !note.isShared) {
+    // Check if user has permission to view the note
+    if (!(await canViewNote(note, role))) {
       return NextResponse.json(
         { message: "You don't have permission to view this note" },
         { status: 403 }
@@ -138,7 +156,7 @@ export async function PUT(
 
     const role = await checkUserPermissions(params.id, user.id);
 
-    if (!role || role === "VIEWER") {
+    if (!role) {
       return NextResponse.json(
         { message: "You don't have permission to edit notes" },
         { status: 403 }
@@ -163,7 +181,7 @@ export async function PUT(
       );
     }
 
-    const { title, content, isShared } = await request.json();
+    const { title, content, sharedWithRoles = [] } = await request.json();
 
     if (!title || !content) {
       return NextResponse.json(
@@ -172,12 +190,18 @@ export async function PUT(
       );
     }
 
+    // Only admins can update sharing settings
+    const sharingUpdate = role === "ADMIN" ? {
+      isShared: sharedWithRoles.length > 0,
+      sharedWithRoles,
+    } : {};
+
     const updatedNote = await prisma.note.update({
       where: { id: params.noteId },
       data: {
         title,
         content,
-        ...(role === "ADMIN" ? { isShared } : {}),
+        ...sharingUpdate,
         editHistory: {
           create: {
             title,
@@ -248,7 +272,7 @@ export async function DELETE(
 
     const role = await checkUserPermissions(params.id, user.id);
 
-    if (!role || role === "VIEWER") {
+    if (!role) {
       return NextResponse.json(
         { message: "You don't have permission to delete notes" },
         { status: 403 }
@@ -266,7 +290,8 @@ export async function DELETE(
       );
     }
 
-    if (!(await canEditNote(note, user.id, role))) {
+    // Only allow note deletion by creator or admin
+    if (note.createdById !== user.id && role !== "ADMIN") {
       return NextResponse.json(
         { message: "You don't have permission to delete this note" },
         { status: 403 }
