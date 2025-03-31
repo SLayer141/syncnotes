@@ -51,18 +51,29 @@ export async function getNotes(organizationId: string) {
       });
     }
 
-    // For members, get notes created by members
+    // For members and viewers, get notes that are:
+    // 1. Created by them
+    // 2. Shared with their role
     return await prisma.note.findMany({
       where: {
         organizationId,
-        createdBy: {
-          organizations: {
-            some: {
-              organizationId,
-              role: 'MEMBER',
-            },
+        OR: [
+          {
+            createdById: session.user.id,
           },
-        },
+          {
+            AND: [
+              {
+                isShared: true,
+              },
+              {
+                sharedWithRoles: {
+                  has: userRole.role,
+                },
+              },
+            ],
+          },
+        ],
       },
       include: {
         createdBy: {
