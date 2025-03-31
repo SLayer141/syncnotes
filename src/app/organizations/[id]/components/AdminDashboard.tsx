@@ -26,24 +26,12 @@ interface Note {
   updatedAt: Date;
   createdById: string;
   organizationId: string;
+  sharedWithRoles: string[];
   createdBy: {
     id: string;
     name: string | null;
     email: string | null;
   };
-  editHistory: {
-    id: string;
-    title: string;
-    content: string;
-    noteId: string;
-    editedById: string;
-    editedAt: Date;
-    editedBy: {
-      id: string;
-      name: string | null;
-      email: string | null;
-    };
-  }[];
 }
 
 interface ActivityLog {
@@ -62,12 +50,12 @@ interface ActivityLog {
 
 interface AdminDashboardProps {
   organizationId: string;
-  members: Member[];
+  members?: Member[];
   onMemberUpdate?: (member: Member) => void;
   onMemberRemove?: (memberId: string) => void;
 }
 
-export default function AdminDashboard({ organizationId, members, onMemberUpdate, onMemberRemove }: AdminDashboardProps) {
+export default function AdminDashboard({ organizationId, members = [], onMemberUpdate, onMemberRemove }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'activity'>('overview');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -90,7 +78,7 @@ export default function AdminDashboard({ organizationId, members, onMemberUpdate
       const result = await getActivityLogs(organizationId);
       
       if ('error' in result) {
-        throw new Error(result.error);
+        throw new Error(result.error as string);
       }
       
       setActivityLogs(result.logs);
@@ -107,10 +95,10 @@ export default function AdminDashboard({ organizationId, members, onMemberUpdate
       const result = await getNotes(organizationId);
       
       if ('error' in result) {
-        throw new Error(result.error);
+        throw new Error(result.error as string);
       }
       
-      setNotes(result.notes);
+      setNotes(Array.isArray(result) ? result : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load notes');
       console.error(err);
