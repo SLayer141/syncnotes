@@ -9,62 +9,61 @@ import { createActivityLog } from "./activity-logs";
 export async function getNotes(organizationId: string) {
   try {
     const session = await getServerSession(authOptions);
-
-    if (!session?.user?.email) {
-      throw new Error("Not authenticated");
+    if (!session?.user?.id) {
+      throw new Error('Unauthorized');
     }
 
-    // Get the user and their role in the organization
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-    });
-
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    const member = await prisma.organizationMember.findUnique({
+    // Get user's role in the organization
+    const userRole = await prisma.organizationMember.findUnique({
       where: {
         organizationId_userId: {
+          userId: session.user.id,
           organizationId,
-          userId: user.id,
         },
+      },
+      select: {
+        role: true,
       },
     });
 
-    if (!member) {
-      throw new Error("You don't have access to this organization");
+    if (!userRole) {
+      throw new Error('User is not a member of this organization');
     }
 
-    // Build the where clause based on user role
-    let whereClause: any = {
-      organizationId,
-    };
-
-    // If not an admin, add role-based filters
-    if (member.role !== 'ADMIN') {
-      if (member.role === 'MEMBER') {
-        // Members can see their own notes and notes shared with MEMBER role
-        whereClause.OR = [
-          { createdById: user.id },
-          {
-            AND: [
-              { isShared: true },
-              { sharedWithRoles: { has: 'MEMBER' } }
-            ]
-          }
-        ];
-      } else if (member.role === 'VIEWER') {
-        // Viewers can only see notes shared with VIEWER role
-        whereClause.AND = [
-          { isShared: true },
-          { sharedWithRoles: { has: 'VIEWER' } }
-        ];
-      }
+    // If user is admin, get all notes
+    if (userRole.role === 'ADMIN') {
+      return await prisma.note.findMany({
+        where: {
+          organizationId,
+        },
+        include: {
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
     }
 
-    const notes = await prisma.note.findMany({
-      where: whereClause,
+    // For members, get notes created by members
+    return await prisma.note.findMany({
+      where: {
+        organizationId,
+        createdBy: {
+          organizations: {
+            some: {
+              organizationId,
+              role: 'MEMBER',
+            },
+          },
+        },
+      },
       include: {
         createdBy: {
           select: {
@@ -73,29 +72,14 @@ export async function getNotes(organizationId: string) {
             email: true,
           },
         },
-        editHistory: {
-          include: {
-            editedBy: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-          },
-          orderBy: {
-            editedAt: 'desc',
-          },
-        },
       },
       orderBy: {
-        updatedAt: 'desc',
+        createdAt: 'desc',
       },
     });
-
-    return { notes };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Failed to fetch notes" };
+    console.error('Error fetching notes:', error);
+    throw error;
   }
 }
 

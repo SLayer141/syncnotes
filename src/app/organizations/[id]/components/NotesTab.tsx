@@ -165,13 +165,13 @@ export default function NotesTab({ organizationId, userRole, onNotesChange }: No
   const fetchNotes = async () => {
     try {
       setLoading(true);
-      const result = await getNotes(organizationId);
+      const notes = await getNotes(organizationId);
       
-      if ('error' in result) {
-        throw new Error(result.error);
+      if (Array.isArray(notes)) {
+        setNotes(notes);
+      } else {
+        throw new Error('Failed to load notes');
       }
-      
-      setNotes(result.notes);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load notes');
       console.error(err);
@@ -245,9 +245,11 @@ export default function NotesTab({ organizationId, userRole, onNotesChange }: No
   }
 
   const canEditNote = (note: Note) => {
-    if (userRole === 'ADMIN') return true;
-    if (userRole === 'MEMBER' && note.createdById === session?.user?.id) return true;
-    return false;
+    if (!session?.user?.id) return false;
+    return (
+      userRole === 'ADMIN' ||
+      (userRole === 'MEMBER' && note.createdById === session.user.id)
+    );
   };
 
   return (
