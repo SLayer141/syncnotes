@@ -261,70 +261,56 @@ export default function NotesTab({ organizationId, userRole, onNotesChange }: No
       )}
 
       {/* Create Note Button */}
-      {userRole !== 'VIEWER' && (
-        <div className="flex justify-end">
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors"
-          >
-            Create Note
-          </button>
-        </div>
+      {(userRole === 'ADMIN' || userRole === 'MEMBER') && (
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors"
+        >
+          Create Note
+        </button>
       )}
 
-      {/* Notes Grid */}
+      {/* Notes List */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {notes.map(note => (
-          <div
-            key={note.id}
-            className="bg-gray-800 rounded-lg p-6 space-y-4 hover:bg-gray-700 transition-colors"
-          >
-            <div className="flex justify-between items-start">
+        {notes.map((note) => (
+          <div key={note.id} className="bg-gray-800 p-6 rounded-lg">
+            <div className="flex justify-between items-start mb-4">
               <h3 className="text-xl font-semibold text-white">{note.title}</h3>
-              {note.isShared && (
-                <div className="flex flex-wrap gap-1">
-                  {note.sharedWithRoles.map((role) => (
-                    <span
-                      key={role}
-                      className="bg-green-600/20 text-green-400 text-xs px-2 py-1 rounded"
-                    >
-                      {role.charAt(0) + role.slice(1).toLowerCase()}
-                    </span>
-                  ))}
+              {canEditNote(note) && (
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => setEditingNote(note)}
+                    className="text-indigo-400 hover:text-indigo-300"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDeleteNote(note.id)}
+                    className="text-red-400 hover:text-red-300"
+                  >
+                    Delete
+                  </button>
                 </div>
               )}
             </div>
-            
-            <p className="text-gray-300 line-clamp-3">{note.content}</p>
-            
-            <div className="text-sm text-gray-400">
-              Created by {note.createdBy.name || note.createdBy.email}
-              <br />
-              Last edited {new Date(note.updatedAt).toLocaleDateString()}
-            </div>
-
-            {/* Actions */}
-            {canEditNote(note) && (
-              <div className="flex justify-end space-x-3 pt-4 border-t border-gray-700">
-                <button
-                  onClick={() => setEditingNote(note)}
-                  className="text-indigo-400 hover:text-indigo-300"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDeleteNote(note.id)}
-                  className="text-red-400 hover:text-red-300"
-                >
-                  Delete
-                </button>
+            <p className="text-gray-300 mb-4">{note.content}</p>
+            <div className="flex justify-between items-center text-sm text-gray-400">
+              <div>
+                Created by: {note.createdBy.name || note.createdBy.email}
               </div>
-            )}
+              <div>
+                {note.isShared && note.sharedWithRoles.length > 0 && (
+                  <span className="text-indigo-400">
+                    Shared with: {note.sharedWithRoles.join(', ')}
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Create/Edit Modal */}
+      {/* Create/Edit Note Modal */}
       {(showCreateModal || editingNote) && (
         <NoteModal
           note={editingNote}
@@ -333,7 +319,7 @@ export default function NotesTab({ organizationId, userRole, onNotesChange }: No
             setEditingNote(null);
           }}
           onSubmit={editingNote ? handleUpdateNote : handleCreateNote}
-          canShare={userRole === 'ADMIN'}
+          canShare={userRole === 'ADMIN' || userRole === 'MEMBER'}
         />
       )}
     </div>

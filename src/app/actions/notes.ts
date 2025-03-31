@@ -190,8 +190,8 @@ export async function updateNote(
       throw new Error("You don't have access to this note");
     }
 
-    // Only allow sharing if user is an admin
-    const canShare = member.role === 'ADMIN';
+    // Allow sharing if user is an admin or member
+    const canShare = member.role === 'ADMIN' || member.role === 'MEMBER';
     const updatedSharedWithRoles = canShare ? sharedWithRoles : note.sharedWithRoles;
     const isShared = updatedSharedWithRoles.length > 0;
 
