@@ -3,6 +3,12 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+interface Note {
+  createdById: string;
+  isShared: boolean;
+  sharedWithRoles?: string[];
+}
+
 // Helper function to check user's role and permissions
 async function checkUserPermissions(organizationId: string, userId: string) {
   const member = await prisma.organizationMember.findUnique({
@@ -22,7 +28,7 @@ async function checkUserPermissions(organizationId: string, userId: string) {
 }
 
 // Helper function to check if user can edit note
-async function canEditNote(note: any, userId: string, role: string) {
+async function canEditNote(note: Note, userId: string, role: string) {
   if (role === "ADMIN") return true;
   if (role === "MEMBER" && note.createdById === userId) return true;
   if (role === "VIEWER") {
@@ -33,7 +39,7 @@ async function canEditNote(note: any, userId: string, role: string) {
 }
 
 // Helper function to check if user can view note
-async function canViewNote(note: any, role: string) {
+async function canViewNote(note: Note, role: string) {
   if (role === "ADMIN" || role === "MEMBER") return true;
   if (role === "VIEWER") {
     if (!note.isShared) return false;

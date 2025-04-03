@@ -132,7 +132,7 @@ export default function InvitationPage({ params }: { params: Promise<{ id: strin
           ) : (
             <>
               <p className="text-gray-300 mb-6">
-                You've been invited to join {invitationStatus?.organizationName || 'an organization'}. 
+                You&apos;ve been invited to join {invitationStatus?.organizationName || 'an organization'}. 
                 Click the button below to accept the invitation.
               </p>
               

@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 import { getNotes, createNote, updateNote, deleteNote } from '@/app/actions/notes';
 
 interface Note {
@@ -155,7 +154,6 @@ export default function NotesTab({ organizationId, userRole, onNotesChange }: No
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const { data: session } = useSession();
-  const router = useRouter();
 
   // Fetch notes
   useEffect(() => {

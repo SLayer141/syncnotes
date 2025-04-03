@@ -50,7 +50,7 @@ export default function OrganizationPage({ params }: { params: Promise<{ id: str
     } else if (status === "authenticated") {
       loadOrganization();
     }
-  }, [status, resolvedParams.id]);
+  }, [status, resolvedParams.id, router]);
 
   async function loadOrganization() {
     try {

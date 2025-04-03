@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { getOrganizations, createOrganization } from "@/app/actions/organizations";
 
 interface Organization {
@@ -176,7 +175,7 @@ export default function HomePage() {
 
         {organizations.length === 0 && !showCreateForm && (
           <div className="text-center py-12">
-            <p className="text-gray-400">You haven't joined any organizations yet.</p>
+            <p className="text-gray-400">You haven&apos;t joined any organizations yet.</p>
             <button
               onClick={() => setShowCreateForm(true)}
               className="mt-4 text-indigo-400 hover:text-indigo-300"

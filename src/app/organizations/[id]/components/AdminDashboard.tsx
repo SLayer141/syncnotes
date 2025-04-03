@@ -70,7 +70,7 @@ export default function AdminDashboard({ organizationId, members = [], onMemberU
     }
     // Always fetch notes for the stats
     fetchNotes();
-  }, [activeTab]);
+  }, [activeTab, organizationId]);
 
   const fetchActivityLogs = async () => {
     try {
@@ -98,7 +98,7 @@ export default function AdminDashboard({ organizationId, members = [], onMemberU
         throw new Error(result.error as string);
       }
       
-      setNotes(Array.isArray(result) ? result : []);
+      setNotes(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load notes');
       console.error(err);

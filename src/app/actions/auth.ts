@@ -3,7 +3,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { hash, compare } from "bcryptjs";
+import { hash } from "bcryptjs";
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { generateOTP } from "@/lib/auth-utils";
@@ -126,7 +126,7 @@ export async function register(email: string, password: string, name: string) {
 
     const hashedPassword = await hash(password, 12);
 
-    const user = await prisma.user.create({
+    await prisma.user.create({
       data: {
         email,
         password: hashedPassword,
@@ -157,7 +157,7 @@ export async function register(email: string, password: string, name: string) {
   }
 }
 
-export async function login(email: string, password: string) {
+export async function login(email: string) {
   try {
     const user = await prisma.user.findUnique({
       where: { email },

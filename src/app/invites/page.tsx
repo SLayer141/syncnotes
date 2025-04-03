@@ -23,7 +23,7 @@ interface Invitation {
 }
 
 export default function InvitesPage() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const router = useRouter();
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,7 +35,7 @@ export default function InvitesPage() {
     } else if (status === "authenticated") {
       fetchInvitations();
     }
-  }, [status]);
+  }, [status, router]);
 
   async function fetchInvitations() {
     try {

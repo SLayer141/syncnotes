@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
+import Image from "next/image";
 
 async function getUserProfile() {
   const session = await getServerSession(authOptions);
@@ -49,10 +50,12 @@ export default async function ProfilePage() {
         <div className="bg-gray-800 rounded-lg p-6 mb-8">
           <div className="flex items-center space-x-4">
             {user.image && (
-              <img
+              <Image
                 src={user.image}
                 alt={user.name || 'Profile'}
-                className="w-16 h-16 rounded-full"
+                width={64}
+                height={64}
+                className="rounded-full"
               />
             )}
             <div>

@@ -6,7 +6,6 @@ import { inviteMember } from "@/app/actions/organization-members";
 interface InviteFormProps {
   organizationId: string;
   organizationName: string;
-  senderName: string;
   onClose: () => void;
   onSuccess: () => void;
   isAdmin: boolean;
@@ -15,7 +14,6 @@ interface InviteFormProps {
 export default function InviteForm({
   organizationId,
   organizationName,
-  senderName,
   onClose,
   onSuccess,
   isAdmin,

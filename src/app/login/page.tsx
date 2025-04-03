@@ -10,7 +10,6 @@ export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [authMethod, setAuthMethod] = useState<"password" | "otp">("password");
   const [otpSent, setOtpSent] = useState(false);
@@ -20,7 +19,6 @@ export default function LoginPage() {
     setIsLoading(true);
     setError(null);
     setMessage(null);
-    setPreviewUrl(null);
 
     const formData = new FormData(event.currentTarget);
     const email = formData.get("email") as string;
@@ -32,15 +30,12 @@ export default function LoginPage() {
           const result = await sendOTP(email);
 
           if ('error' in result) {
-            throw new Error(result.error + (result.details ? `\n${result.details}` : ''));
+            throw new Error(result.error);
           }
 
           setOtpSent(true);
           if (result.message) {
             setMessage(result.message);
-          }
-          if (result.previewUrl) {
-            setPreviewUrl(result.previewUrl);
           }
           setIsLoading(false);
           return;
@@ -94,18 +89,6 @@ export default function LoginPage() {
           {message && (
             <div className="bg-blue-900/50 text-blue-200 p-3 rounded text-sm">
               {message}
-              {previewUrl && (
-                <div className="mt-2">
-                  <a 
-                    href={previewUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-blue-400 hover:text-blue-300 underline"
-                  >
-                    Click here to view the test email
-                  </a>
-                </div>
-              )}
             </div>
           )}
           <div className="rounded-md shadow-sm -space-y-px">
@@ -164,7 +147,6 @@ export default function LoginPage() {
                   setOtpSent(false);
                   setError(null);
                   setMessage(null);
-                  setPreviewUrl(null);
                 }}
                 className={`text-sm ${
                   authMethod === "password"
@@ -181,7 +163,6 @@ export default function LoginPage() {
                   setOtpSent(false);
                   setError(null);
                   setMessage(null);
-                  setPreviewUrl(null);
                 }}
                 className={`text-sm ${
                   authMethod === "otp"
@@ -214,7 +195,7 @@ export default function LoginPage() {
             href="/register"
             className="text-sm text-indigo-400 hover:text-indigo-300"
           >
-            Don't have an account? Sign up
+            Don&apos;t have an account? Sign up
           </Link>
         </div>
       </div>
