@@ -8,9 +8,8 @@ import InviteForm from "@/components/InviteForm";
 import MembersTab from './components/MembersTab';
 import NotesTab from './components/NotesTab';
 import AdminDashboard from './components/AdminDashboard';
-import { getOrganization, updateOrganization, deleteOrganization } from '@/app/actions/organizations';
-import { inviteMember, updateMemberRole, removeMember } from '@/app/actions/organization-members';
-import { createActivityLog } from '@/app/actions/activity-logs';
+import { getOrganization, deleteOrganization } from '@/app/actions/organizations';
+import { updateMemberRole, removeMember } from '@/app/actions/organization-members';
 import InvitesTab from './components/InvitesTab';
 
 interface Member {

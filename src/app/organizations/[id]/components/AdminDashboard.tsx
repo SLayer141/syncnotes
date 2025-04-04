@@ -1,7 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
-import { updateMemberRole, removeMember } from '@/app/actions/organization-members';
 import { getActivityLogs } from '@/app/actions/activity-logs';
 import { getNotes } from '@/app/actions/notes';
 
@@ -61,8 +58,6 @@ export default function AdminDashboard({ organizationId, members = [] }: AdminDa
   const [error, setError] = useState<string | null>(null);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
-  const { data: session } = useSession();
-  const router = useRouter();
 
   const fetchActivityLogs = useCallback(async () => {
     try {

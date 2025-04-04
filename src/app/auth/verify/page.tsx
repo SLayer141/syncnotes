@@ -33,7 +33,7 @@ export default function VerifyPage() {
         }
 
         router.push("/");
-      } catch (error) {
+      } catch (_) {
         setError("Something went wrong");
         setIsLoading(false);
       }
