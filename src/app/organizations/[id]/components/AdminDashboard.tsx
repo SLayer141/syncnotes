@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { updateMemberRole, removeMember } from '@/app/actions/organization-members';
@@ -55,7 +55,7 @@ interface AdminDashboardProps {
   onMemberRemove?: (memberId: string) => void;
 }
 
-export default function AdminDashboard({ organizationId, members = [], onMemberUpdate, onMemberRemove }: AdminDashboardProps) {
+export default function AdminDashboard({ organizationId, members = [] }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'activity'>('overview');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,15 +64,7 @@ export default function AdminDashboard({ organizationId, members = [], onMemberU
   const { data: session } = useSession();
   const router = useRouter();
 
-  useEffect(() => {
-    if (activeTab === 'activity') {
-      fetchActivityLogs();
-    }
-    // Always fetch notes for the stats
-    fetchNotes();
-  }, [activeTab, organizationId]);
-
-  const fetchActivityLogs = async () => {
+  const fetchActivityLogs = useCallback(async () => {
     try {
       setLoading(true);
       const result = await getActivityLogs(organizationId);
@@ -88,9 +80,9 @@ export default function AdminDashboard({ organizationId, members = [], onMemberU
     } finally {
       setLoading(false);
     }
-  };
+  }, [organizationId]);
 
-  const fetchNotes = async () => {
+  const fetchNotes = useCallback(async () => {
     try {
       const result = await getNotes(organizationId);
       
@@ -103,7 +95,15 @@ export default function AdminDashboard({ organizationId, members = [], onMemberU
       setError(err instanceof Error ? err.message : 'Failed to load notes');
       console.error(err);
     }
-  };
+  }, [organizationId]);
+
+  useEffect(() => {
+    if (activeTab === 'activity') {
+      fetchActivityLogs();
+    }
+    // Always fetch notes for the stats
+    fetchNotes();
+  }, [activeTab, organizationId, fetchActivityLogs, fetchNotes]);
 
   // Stats for the overview tab
   const stats = {

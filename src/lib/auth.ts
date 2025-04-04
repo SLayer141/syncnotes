@@ -3,7 +3,6 @@ import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "./prisma";
 import { compare } from "bcryptjs";
-import { isOTPExpired } from "./auth-utils";
 
 // Extend the built-in session types
 declare module "next-auth" {

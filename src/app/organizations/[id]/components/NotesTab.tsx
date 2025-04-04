@@ -155,12 +155,7 @@ export default function NotesTab({ organizationId, userRole, onNotesChange }: No
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const { data: session } = useSession();
 
-  // Fetch notes
-  useEffect(() => {
-    fetchNotes();
-  }, [organizationId]);
-
-  const fetchNotes = async () => {
+  const fetchNotes = useCallback(async () => {
     try {
       setLoading(true);
       const notes = await getNotes(organizationId);
@@ -176,7 +171,12 @@ export default function NotesTab({ organizationId, userRole, onNotesChange }: No
     } finally {
       setLoading(false);
     }
-  };
+  }, [organizationId]);
+
+  // Fetch notes
+  useEffect(() => {
+    fetchNotes();
+  }, [fetchNotes]);
 
   const handleCreateNote = async (noteId: string | null, title: string, content: string, isShared: boolean, sharedWithRoles: string[]) => {
     try {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from "next/link";
@@ -44,15 +44,7 @@ export default function OrganizationPage({ params }: { params: Promise<{ id: str
   const [error, setError] = useState<string | null>(null);
   const [showInviteForm, setShowInviteForm] = useState(false);
 
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login");
-    } else if (status === "authenticated") {
-      loadOrganization();
-    }
-  }, [status, resolvedParams.id, router]);
-
-  async function loadOrganization() {
+  const loadOrganization = useCallback(async () => {
     try {
       setIsLoading(true);
       const result = await getOrganization(resolvedParams.id);
@@ -80,7 +72,15 @@ export default function OrganizationPage({ params }: { params: Promise<{ id: str
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [resolvedParams.id]);
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/login");
+    } else if (status === "authenticated") {
+      loadOrganization();
+    }
+  }, [status, router, loadOrganization]);
 
   async function handleRemoveMember(memberId: string) {
     try {
@@ -304,7 +304,6 @@ export default function OrganizationPage({ params }: { params: Promise<{ id: str
           <InviteForm
             organizationId={organization.id}
             organizationName={organization.name}
-            senderName={session?.user?.name || session?.user?.email || ''}
             onClose={() => setShowInviteForm(false)}
             onSuccess={() => {
               setShowInviteForm(false);
